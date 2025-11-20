@@ -108,11 +108,10 @@ const LandingPage: React.FC = () => {
                         <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-center max-w-sm">
                             <div className="flex items-center justify-center gap-2 text-red-400 font-bold mb-1">
                                 <AlertCircle className="w-5 h-5" />
-                                <span>Authentication Unavailable</span>
+                                <span>Authentication Config Missing</span>
                             </div>
                             <p className="text-xs text-gray-400">
-                                Google Client ID is not configured in the environment. <br/>
-                                Please set <code className="text-white">GOOGLE_CLIENT_ID</code> in your environment variables.
+                                To enable sign-in, please add the <code className="text-white">GOOGLE_CLIENT_ID</code> secret to your environment variables.
                             </p>
                         </div>
                     )}
