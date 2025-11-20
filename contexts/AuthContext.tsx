@@ -16,8 +16,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<UserProfile | null>(null);
   const [authStatus, setAuthStatus] = useState<AuthStatus>(AuthStatus.CHECKING);
   
-  // Strictly use environment variable. 
-  // DO NOT allow client-side injection of this ID for security.
+  // Strictly use environment variable injected from secrets.
   const clientId = process.env.GOOGLE_CLIENT_ID;
 
   const checkWhitelist = (email: string): boolean => {
@@ -50,7 +49,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const initializeGoogle = () => {
-    if (!clientId || typeof window === 'undefined' || !window.google) return;
+    if (!clientId) {
+      console.warn("GOOGLE_CLIENT_ID secret is missing from environment variables.");
+      return;
+    }
+    
+    if (typeof window === 'undefined' || !window.google) return;
 
     try {
       window.google.accounts.id.initialize({
@@ -59,7 +63,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         auto_select: false, 
         cancel_on_tap_outside: true
       });
-      // We don't prompt immediately, we let LandingPage render the button
     } catch (e) {
       console.error("Error initializing Google Sign In", e);
     }
@@ -91,7 +94,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  // Re-initialize Google when script loads
+  // Re-initialize Google when script loads or auth status changes
   useEffect(() => {
     if (authStatus !== AuthStatus.CHECKING) {
       initializeGoogle();
