@@ -42,6 +42,9 @@ export interface GraphNode extends d3.SimulationNodeDatum {
   label: string;
   image?: string; // For User and Image nodes
   radius: number;
+  // Image dimensions (for rectangles)
+  width?: number;
+  height?: number;
   // Extended properties
   description?: string;
   timestamp?: number;

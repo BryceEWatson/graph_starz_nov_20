@@ -15,12 +15,14 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, onNodeSelect, selectedN
   // State for interactions
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
+  const [dimensionsLoaded, setDimensionsLoaded] = useState(false);
 
   // Refs for D3 instances to allow separate styling updates
   const simulationRef = useRef<d3.Simulation<GraphNode, GraphLink> | null>(null);
-  const linkSelectionRef = useRef<d3.Selection<SVGLineElement, GraphLink, SVGGElement, unknown> | null>(null);
+  const linkSelectionRef = useRef<d3.Selection<SVGPathElement, GraphLink, SVGGElement, unknown> | null>(null);
   const nodeSelectionRef = useRef<d3.Selection<SVGGElement, GraphNode, SVGGElement, unknown> | null>(null);
   const labelSelectionRef = useRef<d3.Selection<SVGTextElement, GraphNode, SVGGElement, unknown> | null>(null);
+  const labelGroupRef = useRef<d3.Selection<SVGGElement, GraphNode, SVGGElement, unknown> | null>(null);
 
   // Resize Observer
   useEffect(() => {
@@ -37,9 +39,54 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, onNodeSelect, selectedN
     return () => resizeObserver.disconnect();
   }, []);
 
-  // 1. D3 Setup & Simulation (Runs only on data/dimension change)
+  // Pre-load image dimensions
   useEffect(() => {
-    if (!svgRef.current || dimensions.width === 0) return;
+    setDimensionsLoaded(false);
+
+    const loadImageDimensions = async () => {
+      const promises = data.nodes.map((node) => {
+        return new Promise<void>((resolve) => {
+          if ((node.type === NodeType.IMAGE || node.type === NodeType.USER) && node.image) {
+            const img = new Image();
+            img.onload = () => {
+              // Calculate dimensions - max size based on radius but maintaining aspect ratio
+              const maxSize = node.radius * 2;
+              const aspectRatio = img.width / img.height;
+
+              if (aspectRatio > 1) {
+                // Landscape
+                node.width = maxSize;
+                node.height = maxSize / aspectRatio;
+              } else {
+                // Portrait or square
+                node.height = maxSize;
+                node.width = maxSize * aspectRatio;
+              }
+              resolve();
+            };
+            img.onerror = () => {
+              // Fallback to square
+              node.width = node.radius * 2;
+              node.height = node.radius * 2;
+              resolve();
+            };
+            img.src = node.image;
+          } else {
+            resolve();
+          }
+        });
+      });
+
+      await Promise.all(promises);
+      setDimensionsLoaded(true);
+    };
+
+    loadImageDimensions();
+  }, [data]);
+
+  // 1. D3 Setup & Simulation (Runs only on data/dimension change and after image dimensions loaded)
+  useEffect(() => {
+    if (!svgRef.current || dimensions.width === 0 || !dimensionsLoaded) return;
 
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove(); // Clear previous render
@@ -54,30 +101,56 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, onNodeSelect, selectedN
         .attr("y", "-50%")
         .attr("width", "200%")
         .attr("height", "200%");
-    
+
     filter.append("feGaussianBlur")
         .attr("stdDeviation", "3")
         .attr("result", "coloredBlur");
-    
+
     const feMerge = filter.append("feMerge");
     feMerge.append("feMergeNode").attr("in", "coloredBlur");
     feMerge.append("feMergeNode").attr("in", "SourceGraphic");
 
-    // Image Patterns
+    // Drop Shadow Filter for Images
+    const dropShadow = defs.append("filter")
+        .attr("id", "drop-shadow")
+        .attr("x", "-50%")
+        .attr("y", "-50%")
+        .attr("width", "200%")
+        .attr("height", "200%");
+
+    dropShadow.append("feGaussianBlur")
+        .attr("in", "SourceAlpha")
+        .attr("stdDeviation", "4");
+
+    dropShadow.append("feOffset")
+        .attr("dx", "0")
+        .attr("dy", "2")
+        .attr("result", "offsetblur");
+
+    dropShadow.append("feComponentTransfer")
+        .append("feFuncA")
+        .attr("type", "linear")
+        .attr("slope", "0.3");
+
+    const feMerge2 = dropShadow.append("feMerge");
+    feMerge2.append("feMergeNode");
+    feMerge2.append("feMergeNode").attr("in", "SourceGraphic");
+
+    // Clip paths for images instead of patterns
     data.nodes.forEach(node => {
       if ((node.type === NodeType.IMAGE || node.type === NodeType.USER) && node.image) {
-        defs.append('pattern')
-          .attr('id', `img-${node.id}`)
-          .attr('patternContentUnits', 'objectBoundingBox')
-          .attr('width', '1')
-          .attr('height', '1')
-          .append('image')
-          .attr('href', node.image)
-          .attr('x', 0)
-          .attr('y', 0)
-          .attr('width', '1')
-          .attr('height', '1')
-          .attr('preserveAspectRatio', 'xMidYMid slice');
+        const width = node.width || node.radius * 2;
+        const height = node.height || node.radius * 2;
+
+        defs.append('clipPath')
+          .attr('id', `clip-${node.id}`)
+          .append('rect')
+          .attr('x', -width / 2)
+          .attr('y', -height / 2)
+          .attr('width', width)
+          .attr('height', height)
+          .attr('rx', 8)
+          .attr('ry', 8);
       }
     });
 
@@ -102,27 +175,36 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, onNodeSelect, selectedN
       .translate(dimensions.width/2, dimensions.height/2)
       .scale(initialScale));
 
-    // Force Simulation
+    // Force Simulation - Increased spacing with dynamic collision based on image size
     const simulation = d3.forceSimulation<GraphNode, GraphLink>(data.nodes)
       .force('link', d3.forceLink<GraphNode, GraphLink>(data.links)
         .id(d => d.id)
-        .distance(d => d.type === 'UPLOADED' ? 80 : 180)
-        .strength(d => d.type === 'UPLOADED' ? 0.8 : 0.25)
+        .distance(d => d.type === 'UPLOADED' ? 120 : 220)
+        .strength(d => d.type === 'UPLOADED' ? 0.6 : 0.2)
       )
       .force('charge', d3.forceManyBody()
-        .strength(d => (d as GraphNode).type === NodeType.ATTRIBUTE ? -200 : -600)
+        .strength(d => (d as GraphNode).type === NodeType.ATTRIBUTE ? -400 : -1000)
       )
       .force('center', d3.forceCenter(0, 0))
-      .force('collide', d3.forceCollide().radius(d => (d as GraphNode).radius + 20).iterations(2));
+      .force('collide', d3.forceCollide().radius(d => {
+        const node = d as GraphNode;
+        if (node.type === NodeType.IMAGE || node.type === NodeType.USER) {
+          // Use the larger dimension for collision
+          const maxDim = Math.max(node.width || node.radius * 2, node.height || node.radius * 2);
+          return maxDim / 2 + 30;
+        }
+        return node.radius + 40;
+      }).iterations(3));
 
     simulationRef.current = simulation;
 
-    // Create Elements & Store in Refs
-    const link = linkLayer.selectAll('line')
+    // Create Elements & Store in Refs - Use paths for curved links
+    const link = linkLayer.selectAll('path')
       .data(data.links)
-      .enter().append('line')
-      .attr('stroke-linecap', 'round');
-    
+      .enter().append('path')
+      .attr('stroke-linecap', 'round')
+      .attr('fill', 'none');
+
     linkSelectionRef.current = link;
 
     const node = nodeLayer.selectAll('g')
@@ -136,15 +218,61 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, onNodeSelect, selectedN
     
     nodeSelectionRef.current = node;
 
-    // Node Visuals
-    node.append('circle')
-      .attr('r', d => d.radius)
-      .attr('fill', d => {
-        if (d.image) return `url(#img-${d.id})`;
-        if (d.type === NodeType.ATTRIBUTE) return '#22d3ee'; 
-        return '#6366f1';
-      })
-      .style('cursor', 'pointer');
+    // Node Visuals - Use actual images with clip paths for image nodes, circles for attributes
+    node.each(function(d) {
+      const nodeGroup = d3.select(this);
+
+      if (d.type === NodeType.IMAGE || d.type === NodeType.USER) {
+        // Use actual image dimensions
+        const width = d.width || d.radius * 2;
+        const height = d.height || d.radius * 2;
+
+        // Background rectangle for shadow
+        nodeGroup.append('rect')
+          .attr('x', -width / 2)
+          .attr('y', -height / 2)
+          .attr('width', width)
+          .attr('height', height)
+          .attr('rx', 8)
+          .attr('ry', 8)
+          .attr('fill', '#1e293b')
+          .attr('filter', 'url(#drop-shadow)')
+          .style('cursor', 'pointer');
+
+        // Actual image element with clip path
+        if (d.image) {
+          nodeGroup.append('image')
+            .attr('href', d.image)
+            .attr('x', -width / 2)
+            .attr('y', -height / 2)
+            .attr('width', width)
+            .attr('height', height)
+            .attr('clip-path', `url(#clip-${d.id})`)
+            .attr('preserveAspectRatio', 'xMidYMid slice')
+            .style('cursor', 'pointer');
+        }
+
+        // Photo-card border effect
+        nodeGroup.append('rect')
+          .attr('x', -width / 2)
+          .attr('y', -height / 2)
+          .attr('width', width)
+          .attr('height', height)
+          .attr('rx', 8)
+          .attr('ry', 8)
+          .attr('fill', 'none')
+          .attr('stroke', 'rgba(255, 255, 255, 0.4)')
+          .attr('stroke-width', 3)
+          .style('pointer-events', 'none')
+          .attr('class', 'photo-border');
+      } else {
+        // Circle for attribute nodes
+        nodeGroup.append('circle')
+          .attr('r', d.radius)
+          .attr('fill', '#22d3ee')
+          .style('cursor', 'pointer');
+      }
+    });
 
     // Interaction Handlers
     node
@@ -154,41 +282,128 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, onNodeSelect, selectedN
         })
         .on('mouseenter', (event, d) => {
             setHoveredNodeId(d.id);
+            const nodeGroup = d3.select(event.currentTarget);
+
+            if (d.type === NodeType.IMAGE || d.type === NodeType.USER) {
+                // Scale up image nodes - use actual dimensions
+                const scaleFactor = 1.1;
+                const width = (d.width || d.radius * 2) * scaleFactor;
+                const height = (d.height || d.radius * 2) * scaleFactor;
+
+                nodeGroup.selectAll('rect, image')
+                    .transition()
+                    .duration(200)
+                    .attr('x', -width / 2)
+                    .attr('y', -height / 2)
+                    .attr('width', width)
+                    .attr('height', height);
+            } else {
+                // Scale up circle nodes
+                nodeGroup.select('circle')
+                    .transition()
+                    .duration(200)
+                    .attr('r', d.radius * 1.15);
+            }
         })
-        .on('mouseleave', () => {
+        .on('mouseleave', (event, d) => {
             setHoveredNodeId(null);
+            const nodeGroup = d3.select(event.currentTarget);
+
+            if (d.type === NodeType.IMAGE || d.type === NodeType.USER) {
+                // Scale back image nodes - use actual dimensions
+                const width = d.width || d.radius * 2;
+                const height = d.height || d.radius * 2;
+
+                nodeGroup.selectAll('rect, image')
+                    .transition()
+                    .duration(200)
+                    .attr('x', -width / 2)
+                    .attr('y', -height / 2)
+                    .attr('width', width)
+                    .attr('height', height);
+            } else {
+                // Scale back circle nodes
+                nodeGroup.select('circle')
+                    .transition()
+                    .duration(200)
+                    .attr('r', d.radius);
+            }
         });
 
-    // Labels - Fix visibility by setting initial fill
-    const label = labelLayer.selectAll('text')
+    // Labels - Add background rectangles for better readability
+    const labelGroup = labelLayer.selectAll('g.label-group')
       .data(data.nodes)
-      .enter().append('text')
-      .attr('dy', d => d.type === NodeType.ATTRIBUTE ? d.radius + 12 : d.radius + 20)
+      .enter().append('g')
+      .attr('class', 'label-group')
+      .style('pointer-events', 'none');
+
+    // Add semi-transparent background for labels
+    labelGroup.append('rect')
+      .attr('class', 'label-bg')
+      .attr('rx', 4)
+      .attr('ry', 4)
+      .attr('fill', 'rgba(2, 6, 23, 0.85)')
+      .attr('stroke', 'rgba(255, 255, 255, 0.1)')
+      .attr('stroke-width', 1);
+
+    // Add text labels with improved styling
+    const label = labelGroup.append('text')
+      .attr('dy', d => {
+        if (d.type === NodeType.ATTRIBUTE) return d.radius + 18;
+        // For image nodes, use half of height plus offset
+        const height = d.height || d.radius * 2;
+        return height / 2 + 24;
+      })
       .attr('text-anchor', 'middle')
       .text(d => d.label)
-      .style('pointer-events', 'none')
-      .style('paint-order', 'stroke')
-      .style('stroke', '#020617') 
-      .style('stroke-width', '3px')
-      .style('stroke-linecap', 'butt')
-      .style('stroke-linejoin', 'round')
-      .attr('fill', d => d.type === NodeType.ATTRIBUTE ? '#99f6e4' : '#e2e8f0'); // Initial color
-    
+      .style('font-size', d => d.type === NodeType.ATTRIBUTE ? '11px' : '13px')
+      .style('font-weight', d => d.type === NodeType.USER ? '600' : '500')
+      .attr('fill', d => d.type === NodeType.ATTRIBUTE ? '#99f6e4' : '#f1f5f9');
+
+    // Position and size the background rectangles
+    labelGroup.each(function(d) {
+      const group = d3.select(this);
+      const text = group.select('text').node() as SVGTextElement;
+      const bbox = text.getBBox();
+
+      group.select('rect.label-bg')
+        .attr('x', bbox.x - 4)
+        .attr('y', bbox.y - 2)
+        .attr('width', bbox.width + 8)
+        .attr('height', bbox.height + 4);
+    });
+
     labelSelectionRef.current = label;
+    labelGroupRef.current = labelGroup;
 
     // Simulation Tick
     simulation.on('tick', () => {
-      link
-        .attr('x1', d => (d.source as GraphNode).x!)
-        .attr('y1', d => (d.source as GraphNode).y!)
-        .attr('x2', d => (d.target as GraphNode).x!)
-        .attr('y2', d => (d.target as GraphNode).y!);
+      // Update curved links
+      link.attr('d', d => {
+        const source = d.source as GraphNode;
+        const target = d.target as GraphNode;
+        const dx = target.x! - source.x!;
+        const dy = target.y! - source.y!;
+        const dr = Math.sqrt(dx * dx + dy * dy);
+
+        // Create gentle curve - stronger for longer distances
+        const curvature = 0.15;
+        const controlPointOffset = dr * curvature;
+
+        // Calculate perpendicular offset for control point
+        const angle = Math.atan2(dy, dx);
+        const perpAngle = angle + Math.PI / 2;
+        const cx = (source.x! + target.x!) / 2 + Math.cos(perpAngle) * controlPointOffset;
+        const cy = (source.y! + target.y!) / 2 + Math.sin(perpAngle) * controlPointOffset;
+
+        // Quadratic bezier curve
+        return `M ${source.x!},${source.y!} Q ${cx},${cy} ${target.x!},${target.y!}`;
+      });
 
       node.attr('transform', d => `translate(${d.x},${d.y})`);
-      
-      label
-        .attr('x', d => d.x!)
-        .attr('y', d => d.y!);
+
+      // Update label groups position
+      labelGroup.attr('transform', d => `translate(${d.x!},${d.y!})`);
     });
 
     function dragstarted(event: any, d: GraphNode) {
@@ -212,7 +427,7 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, onNodeSelect, selectedN
       simulation.stop();
     };
 
-  }, [data, dimensions]);
+  }, [data, dimensions, dimensionsLoaded]);
 
   // 2. Styling Effect (Runs whenever hover/select state changes)
   useEffect(() => {
@@ -231,8 +446,11 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, onNodeSelect, selectedN
         connectedLinkIndices = result.linkIndices;
     }
 
-    // Update Links
+    // Update Links with smooth transitions
     linkSelectionRef.current
+        .transition()
+        .duration(300)
+        .ease(d3.easeCubicOut)
         .attr('stroke', d => {
              const index = (d as any).index;
              if (connectedLinkIndices.has(index)) return '#ffffff';
@@ -242,68 +460,198 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, onNodeSelect, selectedN
         .attr('stroke-opacity', d => {
             const index = (d as any).index;
             if (connectedLinkIndices.has(index)) return 1;
-            if (isDimmedMode) return 0.05; 
+            if (isDimmedMode) return 0.05;
             return d.type === 'HAS_ATTRIBUTE' ? 0.2 : 0.4;
         })
         .attr('stroke-width', d => {
              const index = (d as any).index;
-             if (connectedLinkIndices.has(index)) return 2;
+             if (connectedLinkIndices.has(index)) return 2.5;
              return d.type === 'HAS_ATTRIBUTE' ? 0.5 : 1.5;
         });
 
-    // Update Nodes
-    nodeSelectionRef.current.select('circle')
-        .attr('stroke', d => {
-             if (d.id === focusNodeId) return '#ffffff'; 
-             if (connectedNodeIds.has(d.id)) return 'rgba(255,255,255,0.6)'; 
-             
-             if (d.type === NodeType.USER) return '#ec4899';
-             if (d.type === NodeType.IMAGE) return '#6366f1';
-             return 'none';
-        })
-        .attr('stroke-width', d => {
-            if (d.id === focusNodeId) return 4;
-            if (connectedNodeIds.has(d.id)) return 2;
-            return d.type === NodeType.ATTRIBUTE ? 0 : 3;
-        })
-        .attr('opacity', d => {
-            if (!isDimmedMode) return 1;
-            return connectedNodeIds.has(d.id) ? 1 : 0.1;
-        })
-        .attr('filter', d => {
-            if (d.id === focusNodeId) return 'url(#glow)';
-            if (connectedNodeIds.has(d.id)) return 'url(#glow)';
-            if (d.type === NodeType.ATTRIBUTE && !isDimmedMode) return 'url(#glow)';
-            return null;
-        });
+    // Update Nodes with smooth transitions - handle both image and circle
+    nodeSelectionRef.current.each(function(d: any) {
+        const nodeGroup = d3.select(this);
+        const isImageNode = d.type === NodeType.IMAGE || d.type === NodeType.USER;
+
+        if (isImageNode) {
+            // Update background rect and border rect
+            nodeGroup.selectAll('rect')
+                .transition()
+                .duration(300)
+                .ease(d3.easeCubicOut)
+                .attr('opacity', () => {
+                    if (!isDimmedMode) return 1;
+                    return connectedNodeIds.has(d.id) ? 1 : 0.1;
+                });
+
+            // Update the photo border with highlight stroke
+            nodeGroup.select('.photo-border')
+                .transition()
+                .duration(300)
+                .ease(d3.easeCubicOut)
+                .attr('stroke', () => {
+                    if (d.id === focusNodeId) return '#ffffff';
+                    if (connectedNodeIds.has(d.id)) return 'rgba(255,255,255,0.8)';
+                    return 'rgba(255, 255, 255, 0.4)';
+                })
+                .attr('stroke-width', () => {
+                    if (d.id === focusNodeId) return 4;
+                    if (connectedNodeIds.has(d.id)) return 3;
+                    return 3;
+                });
+
+            // Update image opacity and filter
+            nodeGroup.select('image')
+                .transition()
+                .duration(300)
+                .ease(d3.easeCubicOut)
+                .attr('opacity', () => {
+                    if (!isDimmedMode) return 1;
+                    return connectedNodeIds.has(d.id) ? 1 : 0.1;
+                })
+                .style('filter', () => {
+                    if (d.id === focusNodeId) return 'brightness(1.1)';
+                    if (connectedNodeIds.has(d.id)) return 'brightness(1.05)';
+                    return 'brightness(1)';
+                });
+        } else {
+            // Update circle nodes
+            nodeGroup.select('circle')
+                .transition()
+                .duration(300)
+                .ease(d3.easeCubicOut)
+                .attr('stroke', () => {
+                    if (d.id === focusNodeId) return '#ffffff';
+                    if (connectedNodeIds.has(d.id)) return 'rgba(255,255,255,0.6)';
+                    return 'none';
+                })
+                .attr('stroke-width', () => {
+                    if (d.id === focusNodeId) return 4;
+                    if (connectedNodeIds.has(d.id)) return 3;
+                    return 0;
+                })
+                .attr('opacity', () => {
+                    if (!isDimmedMode) return 1;
+                    return connectedNodeIds.has(d.id) ? 1 : 0.1;
+                })
+                .attr('filter', () => {
+                    if (d.id === focusNodeId) return 'url(#glow)';
+                    if (connectedNodeIds.has(d.id)) return 'url(#glow)';
+                    if (d.type === NodeType.ATTRIBUTE && !isDimmedMode) return 'url(#glow)';
+                    return null;
+                });
+        }
+    });
     
-    // Pulse Animation
+    // Pulse Animation - matches node shape
     nodeSelectionRef.current.selectAll('.node-pulse').remove();
     if (selectedNodeId) {
         const selectedNode = nodeSelectionRef.current.filter(d => d.id === selectedNodeId);
-        selectedNode.append('circle')
-            .attr('r', d => d.radius * 1.4)
-            .attr('fill', 'none')
-            .attr('stroke', '#fde047')
-            .attr('stroke-width', 2)
-            .attr('opacity', 0.5)
-            .attr('class', 'node-pulse');
+        selectedNode.each(function(d: any) {
+            const nodeGroup = d3.select(this);
+            const isImageNode = d.type === NodeType.IMAGE || d.type === NodeType.USER;
+
+            if (isImageNode) {
+                // Rectangle pulse for image nodes - use actual dimensions
+                const width = (d.width || d.radius * 2) * 1.2;
+                const height = (d.height || d.radius * 2) * 1.2;
+
+                nodeGroup.append('rect')
+                    .attr('x', -width / 2)
+                    .attr('y', -height / 2)
+                    .attr('width', width)
+                    .attr('height', height)
+                    .attr('rx', 10)
+                    .attr('ry', 10)
+                    .attr('fill', 'none')
+                    .attr('stroke', '#fde047')
+                    .attr('stroke-width', 2)
+                    .attr('opacity', 0.5)
+                    .attr('class', 'node-pulse');
+            } else {
+                // Circle pulse for attribute nodes
+                nodeGroup.append('circle')
+                    .attr('r', d.radius * 1.4)
+                    .attr('fill', 'none')
+                    .attr('stroke', '#fde047')
+                    .attr('stroke-width', 2)
+                    .attr('opacity', 0.5)
+                    .attr('class', 'node-pulse');
+            }
+        });
     }
 
-    // Update Labels
-    labelSelectionRef.current
-        .attr('opacity', d => {
-             if (!isDimmedMode) return d.type === NodeType.ATTRIBUTE ? 0.7 : 1;
-             return connectedNodeIds.has(d.id) ? 1 : 0.1;
-        })
-        .attr('fill', d => {
-             if (connectedNodeIds.has(d.id)) return '#fff';
-             return d.type === NodeType.ATTRIBUTE ? '#99f6e4' : '#e2e8f0';
-        })
-        .attr('font-weight', d => {
-            if (d.id === focusNodeId) return 'bold';
-            return d.type === NodeType.USER ? 'bold' : 'normal';
+    // Flow Particles on Active Links
+    if (!linkSelectionRef.current) return;
+
+    // Remove existing particles
+    linkSelectionRef.current.selectAll('.flow-particle').remove();
+
+    // Add particles to connected links
+    if (focusNodeId && connectedLinkIndices.size > 0) {
+        linkSelectionRef.current.each(function(d: any, i: number) {
+            if (connectedLinkIndices.has(i)) {
+                const link = d3.select(this);
+                const pathElement = link.node() as SVGPathElement;
+
+                // Add 2-3 particles per active link
+                for (let j = 0; j < 2; j++) {
+                    link.append('circle')
+                        .attr('class', 'flow-particle')
+                        .attr('r', 2)
+                        .attr('fill', '#ffffff')
+                        .attr('opacity', 0.8)
+                        .each(function() {
+                            const particle = d3.select(this);
+                            const animateParticle = () => {
+                                const pathLength = pathElement.getTotalLength();
+                                const startOffset = (j / 2) * pathLength;
+
+                                particle
+                                    .transition()
+                                    .duration(2000)
+                                    .ease(d3.easeLinear)
+                                    .attrTween('transform', () => {
+                                        return (t: number) => {
+                                            const offset = (startOffset + t * pathLength) % pathLength;
+                                            const point = pathElement.getPointAtLength(offset);
+                                            return `translate(${point.x}, ${point.y})`;
+                                        };
+                                    })
+                                    .on('end', animateParticle);
+                            };
+                            animateParticle();
+                        });
+                }
+            }
         });
+    }
+
+    // Update Labels with smooth transitions
+    if (labelGroupRef.current) {
+        labelGroupRef.current
+            .transition()
+            .duration(300)
+            .ease(d3.easeCubicOut)
+            .attr('opacity', d => {
+                if (!isDimmedMode) return 1;
+                return connectedNodeIds.has(d.id) ? 1 : 0.15;
+            });
+
+        labelSelectionRef.current
+            .transition()
+            .duration(300)
+            .ease(d3.easeCubicOut)
+            .attr('fill', d => {
+                if (connectedNodeIds.has(d.id)) return '#fff';
+                return d.type === NodeType.ATTRIBUTE ? '#99f6e4' : '#f1f5f9';
+            })
+            .style('font-weight', d => {
+                if (d.id === focusNodeId) return '700';
+                return d.type === NodeType.USER ? '600' : '500';
+            });
+    }
 
   }, [hoveredNodeId, selectedNodeId, data]); 
 
@@ -314,15 +662,35 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, onNodeSelect, selectedN
   return (
     <div ref={containerRef} className="w-full h-full relative overflow-hidden bg-radial-gradient">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-800 via-slate-950 to-black pointer-events-none" />
-      
-      <svg 
-        ref={svgRef} 
-        width="100%" 
-        height="100%" 
+
+      {/* Floating Particles for Depth */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        {[...Array(30)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute rounded-full"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              width: `${2 + Math.random() * 3}px`,
+              height: `${2 + Math.random() * 3}px`,
+              background: i % 3 === 0 ? '#6366f1' : i % 3 === 1 ? '#22d3ee' : '#ec4899',
+              animation: `float ${15 + Math.random() * 25}s ease-in-out infinite`,
+              animationDelay: `${Math.random() * 10}s`,
+              filter: 'blur(1px)',
+            }}
+          />
+        ))}
+      </div>
+
+      <svg
+        ref={svgRef}
+        width="100%"
+        height="100%"
         className="absolute inset-0 cursor-move active:cursor-grabbing z-0"
         onClick={handleBgClick}
       />
-      
+
       <div className="absolute bottom-4 left-4 pointer-events-none z-10">
         <div className="bg-surface/40 backdrop-blur-md p-3 rounded-lg text-xs text-gray-400 border border-white/10 shadow-lg">
           <p className="font-mono text-primary">Nodes: {data.nodes.length} | Links: {data.links.length}</p>

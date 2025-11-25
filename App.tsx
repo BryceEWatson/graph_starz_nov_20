@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from 'react';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import GraphCanvas from './components/GraphCanvas';
 import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
@@ -188,10 +189,14 @@ const AppContent: React.FC = () => {
 };
 
 const App: React.FC = () => {
+  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <GoogleOAuthProvider clientId={clientId}>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </GoogleOAuthProvider>
   );
 };
 
