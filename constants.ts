@@ -15,6 +15,17 @@ const generatePowerUserData = (): GraphData => {
   const nodes: GraphNode[] = [];
   const links: GraphLink[] = [];
 
+  // Define image aspect ratios for variety
+  const imageDimensions = [
+    { width: 600, height: 400 }, // Landscape
+    { width: 700, height: 450 }, // Landscape wide
+    { width: 400, height: 600 }, // Portrait
+    { width: 450, height: 700 }, // Portrait tall
+    { width: 500, height: 500 }, // Square
+    { width: 800, height: 500 }, // Wide landscape
+    { width: 500, height: 800 }, // Tall portrait
+  ];
+
   // 1. Define Categories/Attributes
   // We group them to create visual clusters in the graph
   const categories = [
@@ -54,14 +65,15 @@ const generatePowerUserData = (): GraphData => {
   ];
 
   users.forEach((user, uIdx) => {
-    // Create User Node
+    // Create User Node - keep avatars mostly square for consistency
+    const avatarSize = 200;
     nodes.push({
       id: user.id,
       type: NodeType.USER,
       label: user.name,
       radius: 40,
-      image: `https://picsum.photos/id/${user.avatar}/200/200`,
-      attributes: [], 
+      image: `https://picsum.photos/id/${user.avatar}/${avatarSize}/${avatarSize}`,
+      attributes: [],
       x: Math.random() * 1000,
       y: Math.random() * 1000,
     });
@@ -73,23 +85,26 @@ const generatePowerUserData = (): GraphData => {
     for (let i = 0; i < numImages; i++) {
       const imgId = `img-${user.id}-${i}`;
       // Deterministic image ID from Lorem Picsum
-      const picId = 100 + (uIdx * 30) + i; 
-      
+      const picId = 100 + (uIdx * 30) + i;
+
       // Pick a main theme from user's focus
       const mainTheme = user.focus[i % user.focus.length];
-      
+
       // Pick 2-4 random attributes
       const imgAttrs = new Set<string>();
       imgAttrs.add(mainTheme); // Always include one core theme tag
-      
+
       // Add 1-2 more from user focus
       imgAttrs.add(user.focus[Math.floor(Math.random() * user.focus.length)]);
-      
+
       // Add 1-2 random "Global" attributes for cross-linking (e.g., a Nature shot that is also "Blue")
       const randomTag = allTags[Math.floor(Math.random() * allTags.length)];
       imgAttrs.add(randomTag);
 
       const attrArray = Array.from(imgAttrs);
+
+      // Pick a random aspect ratio for this image
+      const dimensions = imageDimensions[i % imageDimensions.length];
 
       nodes.push({
         id: imgId,
@@ -97,7 +112,7 @@ const generatePowerUserData = (): GraphData => {
         label: `${mainTheme} Shot ${i + 1}`,
         description: `A stunning capture by ${user.name} focusing on ${mainTheme} elements.`,
         radius: 35,
-        image: `https://picsum.photos/id/${picId}/600/600`,
+        image: `https://picsum.photos/id/${picId}/${dimensions.width}/${dimensions.height}`,
         attributes: attrArray,
         x: Math.random() * 1000,
         y: Math.random() * 1000,

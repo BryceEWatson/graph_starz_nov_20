@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Service account key (DO NOT COMMIT)
+backend/service-account.json
+backend/cors.json
