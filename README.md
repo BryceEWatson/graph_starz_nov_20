@@ -1,18 +1,21 @@
 # Graph Starz
 
-Graph Starz is a graph-based image upload and sharing platform that leverages AI (Google Gemini) to create a coherent global graph of interconnected images, users, and attributes.
+> **Graph Starz is a living map of AI images, where creators are the stars and every contribution expands the universe.**
+
+Graph Starz is a global graph index of AI-generated images, users, and attributes. Every uploaded image becomes a point in this living map, revealing connections between styles, subjects, and moods. An AI Muse reads this map and suggests what to create next through **Muse Stars**—subtle suggested nodes that point to underexplored regions where a new image could expand the universe.
 
 ## Features
 
-- **Interactive Graph Visualization**: Force-directed graph rendering using D3.js with zoom, pan, and node interactions.
-- **AI-Powered Analysis**: Automatically generates titles, descriptions, and tags for uploaded images using Google Gemini 2.5 Flash.
-- **Semantic Connections**: visualizes relationships between Users, Images, and Attributes.
-- **Google Authentication**: Secure sign-in with whitelist/waitlist functionality.
-- **Dark Mode UI**: Polished, space-themed interface built with Tailwind CSS.
+- **Living Map Visualization**: Interactive force-directed graph where creators are stars in a universe of AI images. Navigate the connections between users, images, and attributes.
+- **AI-Powered Understanding**: Gemini 2.5 Flash automatically analyzes images to extract titles, descriptions, and semantic attributes (style, mood, subject, color).
+- **Muse Stars & Graph-Aware Suggestions**: The AI Muse identifies underexplored regions of your map and suggests prompts for images that could exist in model latent space but haven't been created yet.
+- **Semantic Connections**: Visualize how images relate through shared attributes, creating constellations of similar visual ideas.
+- **Secure Authentication**: Google OAuth sign-in with backend-enforced access control.
+- **Dark Mode UI**: Space-themed interface that reflects the star-map metaphor.
 
 ## Prerequisites
 
-- Node.js (v18 or higher)
+- Node.js 20+
 - A Google Cloud Project with:
   - **Gemini API Key** (AI Studio)
   - **OAuth 2.0 Client ID** (Google Identity Services)
@@ -21,8 +24,8 @@ Graph Starz is a graph-based image upload and sharing platform that leverages AI
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/graph-starz.git
-   cd graph-starz
+   git clone https://github.com/BryceEWatson/graph_starz_nov_20.git
+   cd graph_starz_nov_20
    ```
 
 2. **Install dependencies**
@@ -36,7 +39,7 @@ This project requires environment variables to function correctly. Create a `.en
 
 ```env
 # Required for Image Analysis
-API_KEY=your_google_gemini_api_key_here
+GEMINI_API_KEY=your_google_gemini_api_key_here
 
 # Required for Authentication
 GOOGLE_CLIENT_ID=your_google_oauth_client_id_here
@@ -84,6 +87,8 @@ npm start
 - **Storage**: Google Cloud Storage
 
 ## Documentation
+
+> *A living map of AI images, where creators are the stars.*
 
 ### 🚀 Getting Started
 - **[Quick Reference](./docs/QUICK_REFERENCE.md)** - Fast navigation to everything you need
