@@ -32,8 +32,8 @@ pnpm dev
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/yourusername/graph-starz.git
-cd graph-starz
+git clone https://github.com/BryceEWatson/graph_starz_nov_20.git
+cd graph_starz_nov_20
 ```
 
 ### 2. Neo4j Database Setup
