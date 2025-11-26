@@ -79,3 +79,20 @@ npm start
 - **Visualization**: D3.js
 - **AI**: Google Gemini SDK (@google/genai)
 - **Auth**: Google Identity Services (GSI)
+- **Backend**: Node.js, Express, TypeScript
+- **Database**: Neo4j (Graph Database)
+- **Storage**: Google Cloud Storage
+
+## Documentation
+
+### 🚀 Getting Started
+- **[Quick Reference](./docs/QUICK_REFERENCE.md)** - Fast navigation to everything you need
+- **[Development Setup](./docs/DEV_SETUP.md)** - Complete setup guide (one-time)
+
+### 💻 Building Features
+- **[Implementation Guide](./docs/IMPLEMENTATION_GUIDE.md)** - **Step-by-step code examples for all MVP phases**
+- **[MVP Specification](./docs/GRAPH_STARZ_MVP.md)** - Full feature spec and architecture
+
+### 🧪 Testing & Backend
+- **[Testing Guide](./docs/TESTING.md)** - Testing strategy and examples
+- **[Backend README](./backend/README.md)** - Backend-specific instructions
