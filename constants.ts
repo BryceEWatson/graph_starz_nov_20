@@ -1,14 +1,5 @@
 import { GraphData, NodeType, GraphNode, GraphLink } from './types';
 
-// --- WHITELIST CONFIGURATION ---
-// Add emails here that are allowed to access the full app.
-// In a real app, this would be in a database.
-export const WHITELIST = [
-  'demo@example.com', 
-  // Add your own email here to test access
-  // 'your.email@gmail.com' 
-];
-
 // --- GENERATOR LOGIC FOR POWER USER DATA ---
 
 const generatePowerUserData = (): GraphData => {

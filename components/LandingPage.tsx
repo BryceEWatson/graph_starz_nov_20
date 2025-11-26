@@ -17,14 +17,12 @@ const LandingPage: React.FC = () => {
         setError(null);
         await login(codeResponse.code);
       } catch (err) {
-        console.error('Login error:', err);
         setError(err instanceof Error ? err.message : 'Login failed');
       } finally {
         setIsLoggingIn(false);
       }
     },
     onError: (error) => {
-      console.error('Google login error:', error);
       setError('Failed to authenticate with Google');
       setIsLoggingIn(false);
     },
@@ -37,7 +35,6 @@ const LandingPage: React.FC = () => {
       setError(null);
       await joinWaitlist();
     } catch (err) {
-      console.error('Join waitlist error:', err);
       setError(err instanceof Error ? err.message : 'Failed to join waitlist');
     } finally {
       setIsJoiningWaitlist(false);

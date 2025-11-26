@@ -41,6 +41,7 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, onNodeSelect, selectedN
 
   // Pre-load image dimensions
   useEffect(() => {
+    let cancelled = false;
     setDimensionsLoaded(false);
 
     const loadImageDimensions = async () => {
@@ -49,6 +50,10 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, onNodeSelect, selectedN
           if ((node.type === NodeType.IMAGE || node.type === NodeType.USER) && node.image) {
             const img = new Image();
             img.onload = () => {
+              if (cancelled) {
+                resolve();
+                return;
+              }
               // Calculate dimensions - max size based on radius but maintaining aspect ratio
               const maxSize = node.radius * 2;
               const aspectRatio = img.width / img.height;
@@ -65,6 +70,10 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, onNodeSelect, selectedN
               resolve();
             };
             img.onerror = () => {
+              if (cancelled) {
+                resolve();
+                return;
+              }
               // Fallback to square
               node.width = node.radius * 2;
               node.height = node.radius * 2;
@@ -78,10 +87,16 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, onNodeSelect, selectedN
       });
 
       await Promise.all(promises);
-      setDimensionsLoaded(true);
+      if (!cancelled) {
+        setDimensionsLoaded(true);
+      }
     };
 
     loadImageDimensions();
+
+    return () => {
+      cancelled = true;
+    };
   }, [data]);
 
   // 1. D3 Setup & Simulation (Runs only on data/dimension change and after image dimensions loaded)
@@ -406,18 +421,18 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, onNodeSelect, selectedN
       labelGroup.attr('transform', d => `translate(${d.x!},${d.y!})`);
     });
 
-    function dragstarted(event: any, d: GraphNode) {
+    function dragstarted(event: d3.D3DragEvent<SVGGElement, GraphNode, GraphNode>, d: GraphNode) {
       if (!event.active) simulation.alphaTarget(0.3).restart();
       d.fx = d.x;
       d.fy = d.y;
     }
 
-    function dragged(event: any, d: GraphNode) {
+    function dragged(event: d3.D3DragEvent<SVGGElement, GraphNode, GraphNode>, d: GraphNode) {
       d.fx = event.x;
       d.fy = event.y;
     }
 
-    function dragended(event: any, d: GraphNode) {
+    function dragended(event: d3.D3DragEvent<SVGGElement, GraphNode, GraphNode>, d: GraphNode) {
       if (!event.active) simulation.alphaTarget(0);
       d.fx = null;
       d.fy = null;
