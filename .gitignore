@@ -23,6 +23,13 @@ dist-ssr
 *.sln
 *.sw?
 
+# Environment variables and secrets (DO NOT COMMIT)
+.env
+backend/.env
+
+# Claude Code local settings
+.claude/settings.local.json
+
 # Service account key (DO NOT COMMIT)
 backend/service-account.json
 backend/cors.json
