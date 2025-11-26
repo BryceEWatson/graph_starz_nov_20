@@ -56,7 +56,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setAuthStatus(AuthStatus.UNAUTHENTICATED);
       }
     } catch (error) {
-      console.error('Login failed:', error);
       setAuthStatus(AuthStatus.UNAUTHENTICATED);
       throw error;
     }
@@ -69,7 +68,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       await logoutApi();
     } catch (error) {
-      console.error('Logout API call failed:', error);
+      // Silently fail - logout will still clear local state
     }
 
     localStorage.removeItem(TOKEN_KEY);
@@ -91,7 +90,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(toUserProfile(updatedUser));
       setAuthStatus(AuthStatus.WAITLISTED);
     } catch (error) {
-      console.error('Failed to join waitlist:', error);
       throw error;
     }
   };
@@ -130,7 +128,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setAuthStatus(AuthStatus.UNAUTHENTICATED);
         }
       } catch (error) {
-        console.error('Session validation failed:', error);
         localStorage.removeItem(TOKEN_KEY);
         setAuthStatus(AuthStatus.UNAUTHENTICATED);
       }

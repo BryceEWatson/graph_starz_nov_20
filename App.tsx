@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import GraphCanvas from './components/GraphCanvas';
 import Navbar from './components/Navbar';
@@ -26,6 +26,17 @@ const AppContent: React.FC = () => {
   ]);
 
   const selectedNode = graphData.nodes.find(n => n.id === selectedNodeId) || null;
+
+  // Cleanup blob URLs when component unmounts
+  useEffect(() => {
+    return () => {
+      graphData.nodes.forEach(node => {
+        if (node.image?.startsWith('blob:')) {
+          URL.revokeObjectURL(node.image);
+        }
+      });
+    };
+  }, [graphData.nodes]);
 
   const handleNodeSelect = useCallback((node: GraphNode | null) => {
     setSelectedNodeId(node ? node.id : null);
