@@ -10,6 +10,69 @@ The project has extensive documentation with working code examples. Don't reinve
 
 ---
 
+## 🎨 Brand & Voice
+
+### Product Narrative
+
+**Primary Tagline:**
+> Graph Starz is a living map of AI images, where creators are the stars and every contribution expands the universe.
+
+**Short Tagline:**
+> A living map of AI images, where creators are the stars.
+
+### Core Concepts to Weave In
+
+- **Living map / graph index**: Not a feed or gallery—a navigable, interconnected map of images
+- **Creators are the stars**: Each user anchors regions of the map with their unique contributions
+- **AI Muse**: The system that reads the map and suggests what to create next
+- **Muse Stars**: Subtle suggested nodes pointing to underexplored regions where new images could expand the universe
+- **Latent space surfacing**: Many potential images exist in AI model latent space; Muse Stars help surface these undiscovered possibilities
+
+### Terminology Mapping
+
+**User-Facing (UI/Docs):**
+- "Muse Star" — A suggested node in the graph
+- "Living map" — The graph visualization
+- "AI Muse" — The recommendation system
+- "Extend the universe" — Create images in underexplored regions
+
+**Internal (Code/DTOs):**
+- `GapNode` or `MuseStarNode` — Backend representation of Muse Stars
+- `graph index` — Technical term for the Neo4j database
+- `museStarService` — Detection service
+- `aiMuseService` — Prompt generation service
+
+**Always explicitly map** these terms in documentation where both appear.
+
+### Tone Guidelines
+
+✅ **Do:**
+- Use star/universe metaphor as **seasoning, not the whole meal**
+- Keep technical docs precise and grounded
+- Be poetic in UI-facing docs, but still clear
+- Explain the "living map" concept when introducing the project
+- Reference "creators as stars" when discussing user contributions
+
+❌ **Don't:**
+- Force star metaphors into every sentence or technical detail
+- Overexplain the "universe" concept—let it emerge naturally
+- Use space jargon in API endpoints or code comments
+- Replace clear technical terms with metaphors
+
+### Examples of Good vs Bad Usage
+
+✅ **Good:**
+- "The Muse Star feature detects underexplored regions of your map"
+- "In code, Muse Stars are represented as `GapNode` entities"
+- "The AI Muse generates prompts based on nearby images"
+
+❌ **Bad:**
+- "The cosmic star navigator traverses the celestial graph nebula"
+- "Quantum entanglement of image nodes in the metaverse"
+- Forcing "star" into every variable name (`starUser`, `starNode`, `starGraph`)
+
+---
+
 ## 📚 Documentation Structure
 
 ### 1. **QUICK_REFERENCE.md** - Start here
@@ -27,6 +90,7 @@ The project has extensive documentation with working code examples. Don't reinve
   - Phase 2: Upload Pipeline (GCS + Gemini AI)
   - Phase 3: Graph Queries (Neo4j)
   - Phase 4: Similarity Calculations
+  - Phase 5: Muse Stars & Graph-Aware Prompt Suggestions
   - Common patterns (validation, error handling, logging)
 
 **CRITICAL**: Before writing new service/route/middleware code, check if example exists here first!
