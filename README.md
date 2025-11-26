@@ -15,7 +15,7 @@ Graph Starz is a global graph index of AI-generated images, users, and attribute
 
 ## Prerequisites
 
-- Node.js (v18 or higher)
+- Node.js 20+
 - A Google Cloud Project with:
   - **Gemini API Key** (AI Studio)
   - **OAuth 2.0 Client ID** (Google Identity Services)
@@ -24,8 +24,8 @@ Graph Starz is a global graph index of AI-generated images, users, and attribute
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/graph-starz.git
-   cd graph-starz
+   git clone https://github.com/BryceEWatson/graph_starz_nov_20.git
+   cd graph_starz_nov_20
    ```
 
 2. **Install dependencies**
@@ -39,7 +39,7 @@ This project requires environment variables to function correctly. Create a `.en
 
 ```env
 # Required for Image Analysis
-API_KEY=your_google_gemini_api_key_here
+GEMINI_API_KEY=your_google_gemini_api_key_here
 
 # Required for Authentication
 GOOGLE_CLIENT_ID=your_google_oauth_client_id_here

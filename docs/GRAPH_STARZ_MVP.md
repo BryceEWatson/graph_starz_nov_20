@@ -40,18 +40,22 @@ Graph Starz creates an interconnected network of users, images, and AI-generated
      - `type: "subject", value: "cityscape"`
      - `type: "color", value: "neon"`
 
-4. **Muse Star** (UI: "Muse Star", Internal: `GapNode` or `MuseStarNode`)
+4. **Board**
+   - Properties: `id`, `name`, `description`, `createdAt`, `ownerId`
+   - Represents a workspace or collection that contains a subset of the graph for focused exploration
+
+5. **Muse Star** (UI: "Muse Star", Internal: `GapNode` or `MuseStarNode`)
    - Properties: `id`, `type`, `targetAttributes`, `context`, `boardId`
    - Represents a suggested point in the graph where a new image could expand underexplored regions
    - **Mapping**: In code/DTOs, this may be called `GapNode`, but in UI and docs we refer to them as "Muse Stars"
    - Generated dynamically based on current board/graph state
 
-5. **Prompt Suggestion**
+6. **Prompt Suggestion**
    - Properties: `id`, `museStarId`, `promptText`, `context`, `generatedAt`
    - AI-generated prompt ideas for a specific Muse Star
    - Based on nearby images and target attributes
 
-6. **Constellation** (Stretch Goal)
+7. **Constellation** (Stretch Goal)
    - Properties: `id`, `name`, `description`, `createdAt`
    - User-created collections that group related images
 
@@ -118,7 +122,7 @@ Graph Starz creates an interconnected network of users, images, and AI-generated
 - **Framework**: Express.js
 - **Database**: Neo4j (graph database)
 - **Storage**: Google Cloud Storage (image blobs)
-- **AI**: Google Gemini 2.0 Flash via @google/genai SDK
+- **AI**: Google Gemini 2.5 Flash via @google/genai SDK
 - **Auth**: Google OAuth 2.0 with JWT sessions
 
 ### Frontend Stack (Already Built)
