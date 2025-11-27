@@ -22,7 +22,7 @@ export const analyzeImageWithGemini = async (
   }
 
   try {
-    const model = 'gemini-2.5-flash';
+    const model = 'gemini-3-pro-preview';
     
     const response = await ai.models.generateContent({
       model,
