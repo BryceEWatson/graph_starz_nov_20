@@ -8,6 +8,9 @@ import { config } from './config/env.js';
 import { initNeo4j, closeNeo4j } from './config/neo4j.js';
 import { healthRouter } from './routes/health.js';
 import { authRouter } from './routes/auth.js';
+import { uploadsRouter } from './routes/uploads.js';
+import { graphRouter } from './routes/graph.js';
+import { museStarsRouter } from './routes/museStars.js';
 import { errorMiddleware } from './middleware/errorMiddleware.js';
 import { logger } from './utils/logger.js';
 
@@ -29,14 +32,14 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use('/health', healthRouter);
 app.use('/auth', authRouter);
+app.use('/uploads', uploadsRouter);
+app.use('/graph', graphRouter);
+app.use('/muse-stars', museStarsRouter);
 
 // TODO: Add more routes as they're implemented
-// app.use('/uploads', uploadRouter);
-// app.use('/graph', graphRouter);
 // app.use('/me', meRouter);
 // app.use('/users', usersRouter);
 // app.use('/images', imagesRouter);
-// app.use('/constellations', constellationsRouter);
 
 // Error handling middleware (must be last)
 app.use(errorMiddleware);

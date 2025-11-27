@@ -30,7 +30,7 @@ interface HealthStatus {
  * GET /health
  * Basic health check endpoint
  */
-healthRouter.get('/', async (req: Request, res: Response) => {
+healthRouter.get('/', async (_req: Request, res: Response) => {
   try {
     // Check Neo4j connection
     const neo4jHealthy = await checkNeo4jHealth();
@@ -85,7 +85,7 @@ healthRouter.get('/', async (req: Request, res: Response) => {
  * Kubernetes liveness probe endpoint
  * Returns 200 if the service is alive
  */
-healthRouter.get('/live', (req: Request, res: Response) => {
+healthRouter.get('/live', (_req: Request, res: Response) => {
   res.status(200).json({ status: 'alive' });
 });
 
@@ -94,7 +94,7 @@ healthRouter.get('/live', (req: Request, res: Response) => {
  * Kubernetes readiness probe endpoint
  * Returns 200 if the service is ready to handle requests
  */
-healthRouter.get('/ready', async (req: Request, res: Response) => {
+healthRouter.get('/ready', async (_req: Request, res: Response) => {
   try {
     const neo4jHealthy = await checkNeo4jHealth();
 
@@ -104,6 +104,6 @@ healthRouter.get('/ready', async (req: Request, res: Response) => {
       res.status(503).json({ status: 'not_ready', reason: 'Neo4j not connected' });
     }
   } catch (error) {
-    res.status(503).json({ status: 'not_ready', reason: error.message });
+    res.status(503).json({ status: 'not_ready', reason: error instanceof Error ? error.message : String(error) });
   }
 });
