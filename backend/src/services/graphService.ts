@@ -1,6 +1,19 @@
 import { runWriteTransaction, runReadTransaction } from '../config/neo4j.js';
 import { ImageAnalysis } from './aiService.js';
 
+/**
+ * Normalize Neo4j datetime to ISO string for consistent serialization
+ */
+function normalizeDateTime(neoDateTime: any): string {
+  if (!neoDateTime) return new Date().toISOString();
+
+  // Neo4j datetime can be a Neo4j DateTime object or already a string
+  if (typeof neoDateTime === 'string') return neoDateTime;
+  if (neoDateTime.toString) return new Date(neoDateTime.toString()).toISOString();
+
+  return new Date(neoDateTime).toISOString();
+}
+
 export interface Image {
   id: string;
   url: string;
@@ -158,7 +171,7 @@ export async function getUserEgoNetwork(userId: string): Promise<GraphData> {
             thumbnailUrl: img.properties.thumbnailUrl,
             title: img.properties.title,
             description: img.properties.description,
-            uploadedAt: img.properties.uploadedAt,
+            uploadedAt: normalizeDateTime(img.properties.uploadedAt),
           },
         });
         nodeIds.add(img.properties.id);
@@ -178,7 +191,7 @@ export async function getUserEgoNetwork(userId: string): Promise<GraphData> {
             thumbnailUrl: img.properties.thumbnailUrl,
             title: img.properties.title,
             description: img.properties.description,
-            uploadedAt: img.properties.uploadedAt,
+            uploadedAt: normalizeDateTime(img.properties.uploadedAt),
           },
         });
         nodeIds.add(img.properties.id);
@@ -314,7 +327,7 @@ export async function getGlobalGraphSample(
             thumbnailUrl: img.properties.thumbnailUrl,
             title: img.properties.title,
             description: img.properties.description,
-            uploadedAt: img.properties.uploadedAt,
+            uploadedAt: normalizeDateTime(img.properties.uploadedAt),
           },
         });
         nodeIds.add(img.properties.id);

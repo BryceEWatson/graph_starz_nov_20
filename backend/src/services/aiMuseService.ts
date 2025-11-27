@@ -1,10 +1,6 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { config } from '../config/env.js';
 import { runReadTransaction } from '../config/neo4j.js';
 import { MuseStar } from './museStarService.js';
-
-const genAI = new GoogleGenerativeAI(config.gemini.apiKey);
-const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+import { getTextModel } from './geminiClient.js';
 
 export interface PromptSuggestion {
   id: string;
@@ -70,6 +66,7 @@ Format as JSON array:
 
 Return ONLY the JSON array, no other text.`;
 
+  const model = getTextModel();
   const result = await model.generateContent(systemPrompt);
   const response = result.response.text();
 
