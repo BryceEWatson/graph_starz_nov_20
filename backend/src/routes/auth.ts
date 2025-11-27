@@ -79,7 +79,7 @@ authRouter.get('/validate', requireAuth, async (req: Request, res: Response) => 
  * POST /auth/logout
  * Logout (client-side token deletion)
  */
-authRouter.post('/logout', (req: Request, res: Response) => {
+authRouter.post('/logout', (_req: Request, res: Response) => {
   // JWT is stateless, so logout is client-side only
   res.json({ message: 'Logged out successfully' });
 });
