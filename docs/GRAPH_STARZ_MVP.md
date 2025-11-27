@@ -122,7 +122,7 @@ Graph Starz creates an interconnected network of users, images, and AI-generated
 - **Framework**: Express.js
 - **Database**: Neo4j (graph database)
 - **Storage**: Google Cloud Storage (image blobs)
-- **AI**: Google Gemini 2.5 Flash via @google/genai SDK
+- **AI**: Google Gemini 3 Pro via @google/genai SDK
 - **Auth**: Google OAuth 2.0 with JWT sessions
 
 ### Frontend Stack (Already Built)
@@ -169,7 +169,7 @@ Graph Starz creates an interconnected network of users, images, and AI-generated
 
 ### Phase 2: Upload Pipeline ✅
 - [x] Signed URL generation (storageService.ts)
-- [x] Gemini AI analysis (aiService.ts - using gemini-2.0-flash-exp)
+- [x] Gemini AI analysis (aiService.ts - using gemini-3-pro-preview)
 - [x] Attribute extraction (style, mood, subject, color)
 - [x] Graph persistence (graphService.ts - createImageWithAttributes)
 - [x] Upload routes (/uploads/init, /uploads/complete)
