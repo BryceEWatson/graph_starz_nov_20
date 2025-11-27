@@ -16,28 +16,28 @@ function getClient(): GoogleGenerativeAI {
 
 /**
  * Get the vision model for image analysis
- * Currently uses gemini-2.0-flash-exp
+ * Uses Gemini 2.5 Flash (stable)
  */
 export function getVisionModel(): GenerativeModel {
-  return getClient().getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+  return getClient().getGenerativeModel({ model: 'gemini-2.5-flash' });
 }
 
 /**
  * Get the model for text generation (AI Muse prompts)
- * Currently uses gemini-2.0-flash-exp (same as vision for simplicity)
+ * Uses Gemini 2.5 Flash (same as vision for simplicity)
  */
 export function getTextModel(): GenerativeModel {
-  return getClient().getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+  return getClient().getGenerativeModel({ model: 'gemini-2.5-flash' });
 }
 
 /**
  * Update model version globally (for future upgrades)
- * Example: switchModelVersion('gemini-2.5-flash')
+ * Example: switchModelVersion('gemini-3-pro-preview')
  */
 export function switchModelVersion(modelName: string): void {
   // Force recreation of client with new model name
   genAI = null;
   // Note: This is a simple implementation
   // In production, you might want to store the model name in config
-  console.warn(`Model version switching not fully implemented. Current: gemini-2.0-flash-exp, Requested: ${modelName}`);
+  console.warn(`Model version switching not fully implemented. Current: gemini-2.5-flash, Requested: ${modelName}`);
 }
