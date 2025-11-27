@@ -1,7 +1,12 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../middleware/authMiddleware.js';
-import { generateSignedUploadUrl, getPublicUrl, generateThumbnail } from '../services/storageService.js';
+import {
+  generateSignedUploadUrl,
+  getPublicUrl,
+  generateThumbnail,
+  validateAndConsumePendingUpload,
+} from '../services/storageService.js';
 import { analyzeImage } from '../services/aiService.js';
 import { createImageWithAttributes } from '../services/graphService.js';
 import { isWhitelisted } from '../services/authService.js';
@@ -28,7 +33,7 @@ const initUploadSchema = z.object({
 const completeUploadSchema = z.object({
   imageId: z.string().uuid(),
   gcsPath: z.string(),
-  contentType: z.string().regex(/^image\/(jpeg|png|webp|gif)$/),
+  // contentType is now validated from PendingUpload, not trusted from client
 });
 
 /**
@@ -37,10 +42,12 @@ const completeUploadSchema = z.object({
  */
 uploadsRouter.post('/init', async (req: Request, res: Response) => {
   const { filename, contentType } = initUploadSchema.parse(req.body);
+  const userId = req.user!.id;
 
   const { uploadUrl, imageId, gcsPath } = await generateSignedUploadUrl(
     filename,
-    contentType
+    contentType,
+    userId
   );
 
   res.json({
@@ -56,8 +63,18 @@ uploadsRouter.post('/init', async (req: Request, res: Response) => {
  * Trigger AI analysis and create graph nodes
  */
 uploadsRouter.post('/complete', async (req: Request, res: Response) => {
-  const { imageId, gcsPath, contentType } = completeUploadSchema.parse(req.body);
+  const { imageId, gcsPath } = completeUploadSchema.parse(req.body);
   const userId = req.user!.id;
+
+  // Validate that this upload was initiated by this user
+  const validation = await validateAndConsumePendingUpload(imageId, gcsPath, userId);
+
+  if (!validation.valid) {
+    throw new ApiError(400, 'Invalid upload: imageId/gcsPath not found or expired');
+  }
+
+  // Use the content type from the validated pending upload (not from client)
+  const contentType = validation.contentType!;
 
   // Get public URL
   const imageUrl = getPublicUrl(gcsPath);

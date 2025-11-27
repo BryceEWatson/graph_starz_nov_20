@@ -92,7 +92,10 @@ WHITELISTED_EMAILS=your.email@gmail.com,another@example.com
    - Add `http://localhost:3000` (or your dev URL) to "Authorized JavaScript origins".
    - Note both the Client ID and Client Secret.
 3. **Neo4j**: Install Neo4j Desktop or use Neo4j Aura (cloud).
-4. **Google Cloud Storage**: Create a GCS bucket in your GCP project.
+4. **Google Cloud Storage**:
+   - Create a GCS bucket in your GCP project.
+   - **For MVP/Development**: Set the bucket to **public read access** (or use IAM to allow public access to objects). The backend fetches uploaded images via public URLs for AI analysis.
+   - **For Production**: Consider using signed read URLs or GCS SDK direct access instead of public URLs. See [backend/src/services/aiService.ts](backend/src/services/aiService.ts) for implementation details.
 
 ## Access Control
 

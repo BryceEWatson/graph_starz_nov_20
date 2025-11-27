@@ -1,8 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { config } from '../config/env.js';
-
-const genAI = new GoogleGenerativeAI(config.gemini.apiKey);
-const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+import { getVisionModel } from './geminiClient.js';
 
 export interface ImageAnalysis {
   title: string;
@@ -42,6 +38,7 @@ Format as JSON:
   ]
 }`;
 
+  const model = getVisionModel();
   const result = await model.generateContent([
     {
       inlineData: {
