@@ -40,7 +40,7 @@ export async function initNeo4j(): Promise<Driver> {
     return driver;
   } catch (error) {
     logger.error('Failed to connect to Neo4j:', error);
-    throw new Error(`Neo4j connection failed: ${error.message}`);
+    throw new Error(`Neo4j connection failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 

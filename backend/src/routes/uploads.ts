@@ -1,0 +1,82 @@
+import { Router, Request, Response } from 'express';
+import { z } from 'zod';
+import { requireAuth } from '../middleware/authMiddleware.js';
+import { generateSignedUploadUrl, getPublicUrl, generateThumbnail } from '../services/storageService.js';
+import { analyzeImage } from '../services/aiService.js';
+import { createImageWithAttributes } from '../services/graphService.js';
+import { isWhitelisted } from '../services/authService.js';
+import { ApiError } from '../middleware/errorMiddleware.js';
+
+export const uploadsRouter = Router();
+
+// All upload routes require authentication
+uploadsRouter.use(requireAuth);
+
+// Additional check: user must be whitelisted to upload
+uploadsRouter.use((req: Request, _res: Response, next) => {
+  if (!req.user || !isWhitelisted(req.user.email)) {
+    throw new ApiError(403, 'Upload access requires whitelist approval');
+  }
+  next();
+});
+
+const initUploadSchema = z.object({
+  filename: z.string().min(1),
+  contentType: z.string().regex(/^image\/(jpeg|png|webp|gif)$/),
+});
+
+const completeUploadSchema = z.object({
+  imageId: z.string().uuid(),
+  gcsPath: z.string(),
+});
+
+/**
+ * POST /uploads/init
+ * Get signed URL for direct GCS upload
+ */
+uploadsRouter.post('/init', async (req: Request, res: Response) => {
+  const { filename, contentType } = initUploadSchema.parse(req.body);
+
+  const { uploadUrl, imageId, gcsPath } = await generateSignedUploadUrl(
+    filename,
+    contentType
+  );
+
+  res.json({
+    uploadUrl,
+    imageId,
+    gcsPath,
+  });
+});
+
+/**
+ * POST /uploads/complete
+ * Trigger AI analysis and create graph nodes
+ */
+uploadsRouter.post('/complete', async (req: Request, res: Response) => {
+  const { imageId, gcsPath } = completeUploadSchema.parse(req.body);
+  const userId = req.user!.id;
+
+  // Get public URL
+  const imageUrl = getPublicUrl(gcsPath);
+
+  // Analyze image with Gemini
+  const analysis = await analyzeImage(imageUrl);
+
+  // Generate thumbnail (for MVP, same as main image)
+  const thumbnailPath = await generateThumbnail(gcsPath);
+
+  // Create graph nodes
+  const image = await createImageWithAttributes(
+    imageId,
+    userId,
+    imageUrl,
+    getPublicUrl(thumbnailPath),
+    analysis
+  );
+
+  res.json({
+    image,
+    analysis,
+  });
+});
