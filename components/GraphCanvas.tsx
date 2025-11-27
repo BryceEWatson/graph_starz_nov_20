@@ -11,9 +11,11 @@ interface GraphCanvasProps {
 const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, onNodeSelect, selectedNodeId }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  
+
   // State for interactions
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [dimensionsLoaded, setDimensionsLoaded] = useState(false);
 
@@ -233,7 +235,7 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, onNodeSelect, selectedN
     
     nodeSelectionRef.current = node;
 
-    // Node Visuals - Use actual images with clip paths for image nodes, circles for attributes
+    // Node Visuals - Use actual images with clip paths for image nodes, circles for attributes, special rendering for Muse Stars
     node.each(function(d) {
       const nodeGroup = d3.select(this);
 
@@ -280,6 +282,26 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, onNodeSelect, selectedN
           .attr('stroke-width', 3)
           .style('pointer-events', 'none')
           .attr('class', 'photo-border');
+      } else if (d.type === NodeType.MUSE_STAR) {
+        // Muse Star: smaller circle with dashed outline and glow
+        nodeGroup.append('circle')
+          .attr('r', d.radius)
+          .attr('fill', '#fbbf24')
+          .attr('fill-opacity', 0.3)
+          .attr('stroke', '#fbbf24')
+          .attr('stroke-width', 2)
+          .attr('stroke-dasharray', '4,4')
+          .attr('filter', 'url(#glow)')
+          .style('cursor', 'pointer');
+
+        // Add inner star icon
+        nodeGroup.append('text')
+          .attr('text-anchor', 'middle')
+          .attr('dy', '0.35em')
+          .attr('font-size', '18px')
+          .attr('fill', '#fbbf24')
+          .style('pointer-events', 'none')
+          .text('✨');
       } else {
         // Circle for attribute nodes
         nodeGroup.append('circle')
@@ -297,6 +319,19 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, onNodeSelect, selectedN
         })
         .on('mouseenter', (event, d) => {
             setHoveredNodeId(d.id);
+            setHoveredNode(d);
+
+            // Update tooltip position for Muse Stars
+            if (d.type === NodeType.MUSE_STAR) {
+              const rect = containerRef.current?.getBoundingClientRect();
+              if (rect) {
+                setTooltipPos({
+                  x: event.clientX - rect.left,
+                  y: event.clientY - rect.top,
+                });
+              }
+            }
+
             const nodeGroup = d3.select(event.currentTarget);
 
             if (d.type === NodeType.IMAGE || d.type === NodeType.USER) {
@@ -322,6 +357,8 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, onNodeSelect, selectedN
         })
         .on('mouseleave', (event, d) => {
             setHoveredNodeId(null);
+            setHoveredNode(null);
+            setTooltipPos(null);
             const nodeGroup = d3.select(event.currentTarget);
 
             if (d.type === NodeType.IMAGE || d.type === NodeType.USER) {
@@ -712,6 +749,27 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, onNodeSelect, selectedN
           <p className="mt-1 opacity-70">Scroll to Zoom • Drag to Pan • Click Node</p>
         </div>
       </div>
+
+      {/* Muse Star Tooltip */}
+      {hoveredNode?.type === NodeType.MUSE_STAR && tooltipPos && (
+        <div
+          className="absolute z-20 pointer-events-none"
+          style={{
+            left: `${tooltipPos.x + 15}px`,
+            top: `${tooltipPos.y - 10}px`,
+          }}
+        >
+          <div className="bg-gray-900/95 backdrop-blur-md p-3 rounded-lg text-xs border border-amber-500/50 shadow-xl max-w-xs">
+            <p className="font-bold text-amber-300 mb-1">✨ Muse Star</p>
+            <p className="text-gray-300 text-xs leading-relaxed">
+              A suggested point in your map where a new image could expand this part of the universe.
+            </p>
+            {hoveredNode.attributeGap && (
+              <p className="text-gray-400 text-xs mt-2 italic">{hoveredNode.attributeGap}</p>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
