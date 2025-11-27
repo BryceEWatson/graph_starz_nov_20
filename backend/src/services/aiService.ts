@@ -16,8 +16,13 @@ export interface ImageAnalysis {
 
 /**
  * Analyze image using Gemini Vision
+ * @param imageUrl - Public URL of the image to analyze
+ * @param contentType - MIME type of the image (e.g., 'image/jpeg', 'image/png')
  */
-export async function analyzeImage(imageUrl: string): Promise<ImageAnalysis> {
+export async function analyzeImage(
+  imageUrl: string,
+  contentType: string = 'image/jpeg'
+): Promise<ImageAnalysis> {
   const prompt = `Analyze this image and provide:
 1. A creative title (1-5 words)
 2. A brief description (1-2 sentences)
@@ -40,7 +45,7 @@ Format as JSON:
   const result = await model.generateContent([
     {
       inlineData: {
-        mimeType: 'image/jpeg',
+        mimeType: contentType,
         data: await fetchImageAsBase64(imageUrl),
       },
     },
