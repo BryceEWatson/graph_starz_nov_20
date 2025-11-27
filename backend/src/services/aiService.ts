@@ -74,6 +74,9 @@ Format as JSON:
 
 /**
  * Fetch image and convert to base64
+ *
+ * TODO: For production with private buckets, use signed read URLs from GCS
+ * instead of relying on public URLs. This ensures proper access control.
  */
 async function fetchImageAsBase64(url: string): Promise<string> {
   const response = await fetch(url);
