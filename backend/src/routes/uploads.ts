@@ -28,6 +28,7 @@ const initUploadSchema = z.object({
 const completeUploadSchema = z.object({
   imageId: z.string().uuid(),
   gcsPath: z.string(),
+  contentType: z.string().regex(/^image\/(jpeg|png|webp|gif)$/),
 });
 
 /**
@@ -46,6 +47,7 @@ uploadsRouter.post('/init', async (req: Request, res: Response) => {
     uploadUrl,
     imageId,
     gcsPath,
+    contentType, // Return content type so client can pass it to /complete
   });
 });
 
@@ -54,14 +56,14 @@ uploadsRouter.post('/init', async (req: Request, res: Response) => {
  * Trigger AI analysis and create graph nodes
  */
 uploadsRouter.post('/complete', async (req: Request, res: Response) => {
-  const { imageId, gcsPath } = completeUploadSchema.parse(req.body);
+  const { imageId, gcsPath, contentType } = completeUploadSchema.parse(req.body);
   const userId = req.user!.id;
 
   // Get public URL
   const imageUrl = getPublicUrl(gcsPath);
 
-  // Analyze image with Gemini
-  const analysis = await analyzeImage(imageUrl);
+  // Analyze image with Gemini (pass actual content type)
+  const analysis = await analyzeImage(imageUrl, contentType);
 
   // Generate thumbnail (for MVP, same as main image)
   const thumbnailPath = await generateThumbnail(gcsPath);
