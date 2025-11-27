@@ -31,7 +31,7 @@ export function errorMiddleware(
   err: Error | ApiError | z.ZodError,
   req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ): void {
   // Generate request ID for tracking
   const requestId = req.headers['x-request-id'] as string || `req_${Date.now()}`;

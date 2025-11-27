@@ -158,37 +158,49 @@ Graph Starz creates an interconnected network of users, images, and AI-generated
 
 ## MVP Success Criteria
 
-### Phase 1: Core Infrastructure ✓
+### Phase 1: Core Infrastructure ✅
 - [x] Frontend with mock data
 - [x] Basic auth flow (Google Sign-In)
-- [ ] Backend Express server
-- [ ] Neo4j connection
-- [ ] GCS integration
+- [x] Backend Express server
+- [x] Neo4j connection
+- [x] GCS integration
+- [x] JWT authentication middleware
+- [x] Auth routes (/auth/google, /auth/validate, /auth/logout, /auth/waitlist)
 
-### Phase 2: Upload Pipeline
-- [ ] Signed URL generation
-- [ ] Gemini AI analysis
-- [ ] Attribute extraction
-- [ ] Graph persistence
+### Phase 2: Upload Pipeline ✅
+- [x] Signed URL generation (storageService.ts)
+- [x] Gemini AI analysis (aiService.ts - using gemini-2.0-flash-exp)
+- [x] Attribute extraction (style, mood, subject, color)
+- [x] Graph persistence (graphService.ts - createImageWithAttributes)
+- [x] Upload routes (/uploads/init, /uploads/complete)
+- [x] Whitelist enforcement on uploads
 
-### Phase 3: Graph Visualization
-- [ ] Ego network queries
-- [ ] Real-time graph updates
-- [ ] Interactive navigation
-- [ ] Similarity relationships
+### Phase 3: Graph Visualization ✅
+- [x] Ego network queries (getUserEgoNetwork)
+- [x] Global graph queries (getGlobalGraphSample)
+- [x] Graph routes (/graph/ego, /graph/global)
+- [ ] Frontend integration with real graph data (TODO: replace INITIAL_GRAPH_DATA)
+- [ ] Real-time graph updates (TODO: after upload)
+- [ ] Interactive navigation (frontend exists, needs backend integration)
+- [ ] Similarity relationships (structure in place, calculation not yet implemented)
 
-### Phase 4: Discovery Features
+### Phase 4: Discovery Features (Future)
 - [ ] User similarity matching
 - [ ] Trending algorithm
 - [ ] Search by attributes
 - [ ] Constellation creation
 
-### Phase 5: Muse Stars & Graph-Aware Prompt Suggestions
-- [ ] Detect underexplored regions of a board's graph (Muse Star detection)
-- [ ] Surface Muse Stars as subtle suggested nodes in visualization
-- [ ] Generate graph-aware prompts via AI Muse service
-- [ ] Click interaction: Muse Star → Prompt drawer
-- [ ] Context-aware prompt generation based on nearby images and target attributes
+### Phase 5: Muse Stars & Graph-Aware Prompt Suggestions ✅ (MVP)
+- [x] Detect underexplored regions in user's ego network (museStarService.ts)
+- [x] Simple bucket-based detection (style + mood combinations)
+- [x] Generate graph-aware prompts via AI Muse service (aiMuseService.ts)
+- [x] Muse Star routes (/muse-stars/ego, /muse-stars/prompts)
+- [x] Context-aware prompt generation based on nearby images and target attributes
+- [x] Variety in prompts (Safe, Bold, Experimental)
+- [ ] Frontend visualization of Muse Stars (TODO)
+- [ ] Click interaction: Muse Star → Prompt drawer (TODO)
+
+**Note**: Phase 5 is currently scoped to user ego networks. Board-based Muse Stars require implementing Board entity (Phase 4).
 
 ## Database Schema (Neo4j)
 

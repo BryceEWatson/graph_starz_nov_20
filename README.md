@@ -35,45 +35,99 @@ Graph Starz is a global graph index of AI-generated images, users, and attribute
 
 ## Configuration
 
-This project requires environment variables to function correctly. Create a `.env` file in the root directory:
+This project requires environment variables for both frontend and backend.
+
+### Frontend Environment Variables
+
+Create a `.env` file in the **root directory**:
 
 ```env
-# Required for Image Analysis
-GEMINI_API_KEY=your_google_gemini_api_key_here
+# Required for Google Sign-In (Frontend)
+VITE_GOOGLE_CLIENT_ID=your_google_oauth_client_id_here
+```
 
-# Required for Authentication
+### Backend Environment Variables
+
+Create a `.env` file in the **backend** directory. See `backend/.env.example` for a complete template:
+
+```env
+# Server
+PORT=4000
+NODE_ENV=development
+
+# JWT Secret (generate a secure random string)
+GRAPHSTARZ_JWT_SECRET=your_jwt_secret_here
+
+# Neo4j Database
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USERNAME=neo4j
+NEO4J_PASSWORD=your_neo4j_password
+
+# Google Cloud Storage
+GCS_BUCKET=your_gcs_bucket_name
+GCP_PROJECT_ID=your_gcp_project_id
+GCP_STORAGE_LOCATION=us-central1
+
+# Google Gemini AI
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# Google OAuth (Backend)
 GOOGLE_CLIENT_ID=your_google_oauth_client_id_here
+GOOGLE_CLIENT_SECRET=your_google_oauth_client_secret_here
+GOOGLE_OAUTH_REDIRECT_URI=postmessage
+
+# Frontend Origin (CORS)
+FRONTEND_ORIGIN=http://localhost:3000
+
+# Access Control (comma-separated emails)
+WHITELISTED_EMAILS=your.email@gmail.com,another@example.com
 ```
 
 ### How to get keys:
 1. **Gemini API Key**: Visit [Google AI Studio](https://aistudio.google.com/) to generate an API key.
-2. **Google Client ID**: 
+2. **Google OAuth Credentials**:
    - Go to [Google Cloud Console](https://console.cloud.google.com/).
    - Create a project and configure the OAuth Consent Screen.
    - Create Credentials > OAuth Client ID (Web Application).
    - Add `http://localhost:3000` (or your dev URL) to "Authorized JavaScript origins".
+   - Note both the Client ID and Client Secret.
+3. **Neo4j**: Install Neo4j Desktop or use Neo4j Aura (cloud).
+4. **Google Cloud Storage**:
+   - Create a GCS bucket in your GCP project.
+   - **For MVP/Development**: Set the bucket to **public read access** (or use IAM to allow public access to objects). The backend fetches uploaded images via public URLs for AI analysis.
+   - **For Production**: Consider using signed read URLs or GCS SDK direct access instead of public URLs. See [backend/src/services/aiService.ts](backend/src/services/aiService.ts) for implementation details.
 
-## Whitelist / Waitlist
+## Access Control
 
-By default, the application is gated. Only users in the whitelist can access the main graph.
+By default, the application is gated. Only whitelisted users can upload images and access full features.
 
-To manage access:
-1. Open `constants.ts`.
-2. Add authorized email addresses to the `WHITELIST` array:
-   ```typescript
-   export const WHITELIST = [
-     'demo@example.com',
-     'your.email@gmail.com' 
-   ];
+**To manage the whitelist:**
+1. Open `backend/.env`
+2. Add authorized email addresses to the `WHITELISTED_EMAILS` environment variable (comma-separated):
+   ```env
+   WHITELISTED_EMAILS=demo@example.com,your.email@gmail.com
    ```
+
+**Note:** Access control is enforced in the **backend only**. The frontend authenticates users via Google OAuth, but upload permissions and data access are controlled server-side.
 
 ## Running the App
 
-Start the development server:
-
+**Start the backend server:**
 ```bash
-npm start
+cd backend
+npm run dev
 ```
+
+**Start the frontend (in a separate terminal):**
+```bash
+npm run dev
+```
+
+The app will be available at:
+- Frontend: `http://localhost:5173` (Vite default)
+- Backend API: `http://localhost:4000`
+
+**Note:** Neo4j must be running before starting the backend. See [Development Setup](./docs/DEV_SETUP.md) for details.
 
 ## Tech Stack
 
