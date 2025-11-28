@@ -1,4 +1,5 @@
 import { runReadTransaction } from '../config/neo4j.js';
+import neo4j from 'neo4j-driver';
 
 export interface MuseStar {
   id: string;
@@ -58,7 +59,7 @@ export async function detectMuseStarsForUser(
       ORDER BY imageCount ASC
       LIMIT $limit
       `,
-      { userId, limit }
+      { userId, limit: neo4j.int(limit) }
     );
 
     const museStars: MuseStar[] = result.records.map((record: any, idx: number) => ({
@@ -111,6 +112,7 @@ export async function detectMuseStarsByBuckets(
 
       // Identify low-count buckets
       UNWIND buckets as bucket
+      WITH bucket
       WHERE bucket.count < 2
 
       RETURN bucket.style as styleValue,
@@ -120,7 +122,7 @@ export async function detectMuseStarsByBuckets(
       ORDER BY bucket.count ASC
       LIMIT $limit
       `,
-      { userId, limit }
+      { userId, limit: neo4j.int(limit) }
     );
 
     const museStars: MuseStar[] = result.records.map((record: any, idx: number) => ({

@@ -84,11 +84,11 @@ uploadsRouter.post('/complete', async (req: Request, res: Response) => {
   // Use the content type from the validated pending upload (not from client)
   const contentType = validation.contentType!;
 
-  // Get public URL
+  // Get public URL for storing in the database
   const imageUrl = getPublicUrl(gcsPath);
 
-  // Analyze image with Gemini (pass actual content type)
-  const analysis = await analyzeImage(imageUrl, contentType);
+  // Analyze image with Gemini (pass gcsPath to read from private bucket)
+  const analysis = await analyzeImage(gcsPath, contentType);
 
   // Generate thumbnail (for MVP, same as main image)
   const thumbnailPath = await generateThumbnail(gcsPath);

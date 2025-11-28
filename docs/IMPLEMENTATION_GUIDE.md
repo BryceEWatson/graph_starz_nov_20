@@ -1557,4 +1557,27 @@ After implementing these phases:
 4. **Add Metrics** - Prometheus/Grafana monitoring
 5. **Add Admin Panel** - Content moderation
 
+### Storage Layer Improvements
+
+The current MVP uses a public GCS bucket for image storage. This is appropriate for Graph Starz since images are meant to be shared, but future iterations should consider:
+
+1. **Cloud CDN with Caching** - Add Google Cloud CDN in front of the GCS bucket to:
+   - Reduce latency for global users
+   - Lower bandwidth costs
+   - Provide edge caching for frequently accessed images
+
+2. **Referrer Policies** - Implement signed cookies or referrer validation to:
+   - Prevent hotlinking from unauthorized domains
+   - Track image access patterns
+   - Enable analytics on image views
+
+3. **Rate Limiting at CDN Level** - Configure CDN rate limits to:
+   - Prevent abuse and scraping
+   - Protect against DDoS attacks
+   - Control costs from unexpected traffic spikes
+
+4. **Signed URLs for Sensitive Content** (if needed):
+   - Draft/private images could use time-limited signed URLs
+   - Premium features could use authenticated access
+
 For full API reference, see [GRAPH_STARZ_MVP.md](./GRAPH_STARZ_MVP.md)

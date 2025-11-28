@@ -272,6 +272,7 @@ See `backend/.env.example` for complete reference.
 4. ❌ **Don't create new error patterns** - Use ApiError from errorMiddleware
 5. ❌ **Don't bypass validation** - Use Zod schemas like existing routes
 6. ❌ **Don't skip documentation** - Always check IMPLEMENTATION_GUIDE first
+7. ❌ **Don't change default local ports** - Kill conflicting processes instead
 
 ---
 

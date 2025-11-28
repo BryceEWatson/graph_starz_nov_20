@@ -27,7 +27,7 @@ export interface UserProfile {
   id: string;
   name: string;
   email: string;
-  avatar: string;
+  avatar?: string;
 }
 
 export enum AuthStatus {
