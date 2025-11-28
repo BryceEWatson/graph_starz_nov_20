@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { GraphData, GraphNode, GraphLink, NodeType } from '../types';
+import { GraphData, GraphNode, GraphLink, NodeType, RawAttribute } from '../types';
 import { useAuth } from './AuthContext';
 import {
   fetchEgoGraph,
@@ -7,6 +7,7 @@ import {
   BackendGraphData,
 } from '../services/graphService';
 import { fetchMuseStars, MuseStar } from '../services/museStarService';
+import { normalizeAttributes, isCanonicalAttributeValue } from '../attributeDimensions';
 
 interface GraphContextType {
   graphData: GraphData;
@@ -30,6 +31,10 @@ function convertBackendGraphToFrontend(
   museStars: MuseStar[]
 ): GraphData {
   const nodes: GraphNode[] = backendData.nodes.map((node) => {
+    const isAttribute = node.type === 'attribute';
+    const attributeType = isAttribute ? (node.properties.type || 'other') : undefined;
+    const attributeValue = isAttribute ? (node.properties.value || node.id) : undefined;
+
     const baseNode: GraphNode = {
       id: node.id,
       type:
@@ -48,11 +53,61 @@ function convertBackendGraphToFrontend(
       image: node.properties.profilePictureUrl || node.properties.url,
       description: node.properties.description,
       attributes: [],
+      // For attribute nodes: set type and canonical status
+      attributeType,
+      attributeIsCanonical: isAttribute && attributeType && attributeValue
+        ? isCanonicalAttributeValue(attributeType, attributeValue)
+        : undefined,
       x: Math.random() * 1000,
       y: Math.random() * 1000,
     };
 
     return baseNode;
+  });
+
+  // Build a lookup map for nodes
+  const nodeMap = new Map<string, GraphNode>();
+  nodes.forEach((n) => nodeMap.set(n.id, n));
+
+  // Build lookup of attribute node metadata: id -> { type, value }
+  const attributeMeta = new Map<string, { type: string; value: string }>();
+  backendData.nodes.forEach((node) => {
+    if (node.type === 'attribute') {
+      const type = node.properties.type || 'other';
+      const value = node.properties.value || node.id;
+      attributeMeta.set(node.id, { type, value });
+    }
+  });
+
+  // Collect raw attributes per image from HAS_ATTRIBUTE edges
+  const rawByImage = new Map<string, RawAttribute[]>();
+  backendData.edges.forEach((edge) => {
+    if (edge.type !== 'HAS_ATTRIBUTE') return;
+
+    const imageId = edge.source; // backend ensures source = Image id, target = Attribute id
+    const attrId = edge.target;
+    const meta = attributeMeta.get(attrId);
+    if (!meta) return;
+
+    const list = rawByImage.get(imageId) || [];
+    list.push({
+      type: meta.type,
+      value: meta.value,
+      confidence:
+        typeof edge.properties?.confidence === 'number'
+          ? edge.properties.confidence
+          : undefined,
+      source: 'ai',
+      canonical: edge.properties?.canonical === true,
+    });
+    rawByImage.set(imageId, list);
+  });
+
+  // Attach normalized AttributeChips to image nodes
+  rawByImage.forEach((rawAttrs, imageId) => {
+    const node = nodeMap.get(imageId);
+    if (!node) return;
+    node.attributes = normalizeAttributes(rawAttrs);
   });
 
   // Add Muse Star nodes

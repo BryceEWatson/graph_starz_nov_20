@@ -8,6 +8,105 @@ interface GraphCanvasProps {
   selectedNodeId: string | null;
 }
 
+/**
+ * Clamp a value between min and max
+ */
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+/**
+ * Get visual style for a node based on zoom level and active state
+ * Implements LOD (Level of Detail) for zoom-aware rendering
+ *
+ * Key invariant for ATTRIBUTE nodes: visible === labelVisible
+ * No more "mystery bubbles" - if an attribute is rendered, it has a label.
+ */
+function getNodeVisualStyle(
+  node: GraphNode,
+  zoomK: number,
+  isActive: boolean
+): { radius: number; labelVisible: boolean; fontSize: number; opacity: number; visible: boolean } {
+  const k = zoomK || 1;
+
+  // Zoom thresholds for LOD (updated for better UX)
+  const isFar = k < 0.5;
+  const isMedium = k >= 0.5 && k < 1.2;
+  const isClose = k >= 1.2;
+
+  // Base radii per type
+  let baseRadius =
+    node.type === NodeType.IMAGE
+      ? 26
+      : node.type === NodeType.USER
+      ? 22
+      : node.type === NodeType.MUSE_STAR
+      ? 20
+      : 12; // ATTRIBUTE
+
+  // Alpha controls how much the node size compensates for zoom
+  // Higher alpha = more size compensation (stays larger when zoomed out)
+  const alpha =
+    node.type === NodeType.IMAGE || node.type === NodeType.USER
+      ? 0.35 // Key nodes stay more prominent
+      : node.type === NodeType.MUSE_STAR
+      ? 0.3
+      : 0.15; // Attribute nodes shrink more
+
+  // Calculate radius with zoom compensation
+  let radius = baseRadius * Math.pow(1 / k, alpha);
+  radius = clamp(
+    radius,
+    node.type === NodeType.ATTRIBUTE ? 3 : 12, // Min radius
+    node.type === NodeType.IMAGE ? 40 : 32 // Max radius
+  );
+
+  // Visibility and label visibility based on zoom and node type
+  let visible = true;
+  let labelVisible = false;
+
+  if (node.type === NodeType.IMAGE || node.type === NodeType.USER) {
+    // Images & users: always visible, labels visible except at far zoom or when active
+    visible = true;
+    labelVisible = !isFar || isActive;
+  } else if (node.type === NodeType.MUSE_STAR) {
+    // Muse stars: always visible, labels visible at medium/close or when active
+    visible = true;
+    labelVisible = !isFar || isActive;
+  } else if (node.type === NodeType.ATTRIBUTE) {
+    // KEY INVARIANT: For attributes, visible === labelVisible
+    // No mystery bubbles - if you see the node, you see the label
+    const isCanonical = node.attributeIsCanonical === true;
+
+    if (isFar) {
+      // Far zoom: hide ALL attribute nodes
+      visible = false;
+      labelVisible = false;
+    } else if (isMedium) {
+      // Medium zoom: only canonical attributes + active node
+      visible = isCanonical || isActive;
+      labelVisible = visible; // Invariant: if visible, has label
+    } else {
+      // Close zoom: all attributes visible with labels
+      visible = true;
+      labelVisible = true;
+    }
+  }
+
+  // Font size - scale inversely with zoom but clamp
+  const fontSize = labelVisible ? clamp(11 / Math.min(k, 1.4), 9, 14) : 0;
+
+  // Opacity - non-canonical attributes slightly dimmer at medium zoom
+  let opacity = 1;
+  if (node.type === NodeType.ATTRIBUTE && visible) {
+    if (isMedium && !node.attributeIsCanonical) {
+      opacity = 0.85; // Slightly dimmer but still clearly visible
+    }
+  }
+
+  return { radius, labelVisible, fontSize, opacity, visible };
+}
+
 const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, onNodeSelect, selectedNodeId }) => {
   const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -18,6 +117,7 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, onNodeSelect, selectedN
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number } | null>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [dimensionsLoaded, setDimensionsLoaded] = useState(false);
+  const [zoomK, setZoomK] = useState(1);
 
   // Refs for D3 instances to allow separate styling updates
   const simulationRef = useRef<d3.Simulation<GraphNode, GraphLink> | null>(null);
@@ -177,11 +277,13 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, onNodeSelect, selectedN
     const nodeLayer = container.append('g').attr('class', 'nodes');
     const labelLayer = container.append('g').attr('class', 'labels');
 
-    // Zoom Behavior
+    // Zoom Behavior with scale tracking
     const zoom = d3.zoom<SVGSVGElement, unknown>()
-      .scaleExtent([0.05, 4]) 
+      .scaleExtent([0.05, 4])
       .on('zoom', (event) => {
         container.attr('transform', event.transform);
+        // Track zoom scale for LOD rendering
+        setZoomK(event.transform.k);
       });
 
     svg.call(zoom);
@@ -220,7 +322,11 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, onNodeSelect, selectedN
       .data(data.links)
       .enter().append('path')
       .attr('stroke-linecap', 'round')
-      .attr('fill', 'none');
+      .attr('fill', 'none')
+      .attr('stroke', d => d.type === 'HAS_ATTRIBUTE' ? '#22d3ee' : '#6366f1')
+      .attr('stroke-opacity', d => d.type === 'HAS_ATTRIBUTE' ? 0.2 : 0.4)
+      .attr('stroke-width', d => d.type === 'HAS_ATTRIBUTE' ? 0.5 : 1.5)
+      .style('vector-effect', 'non-scaling-stroke');
 
     linkSelectionRef.current = link;
 
@@ -593,6 +699,18 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, onNodeSelect, selectedN
                     if (d.type === NodeType.ATTRIBUTE && !isDimmedMode) return 'url(#glow)';
                     return null;
                 });
+
+            // Update Muse Star text icon opacity to match circle
+            if (d.type === NodeType.MUSE_STAR) {
+                nodeGroup.select('text')
+                    .transition()
+                    .duration(300)
+                    .ease(d3.easeCubicOut)
+                    .attr('opacity', () => {
+                        if (!isDimmedMode) return 1;
+                        return connectedNodeIds.has(d.id) ? 1 : 0.1;
+                    });
+            }
         }
     });
     
@@ -705,7 +823,75 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, onNodeSelect, selectedN
             });
     }
 
-  }, [hoveredNodeId, selectedNodeId, data]); 
+  }, [hoveredNodeId, selectedNodeId, data]);
+
+  // 3. Zoom-based LOD Effect (Runs whenever zoom level changes)
+  // Hides non-visible attribute nodes AND their connected links
+  useEffect(() => {
+    if (!nodeSelectionRef.current || !labelGroupRef.current || !linkSelectionRef.current) return;
+
+    const focusNodeId = hoveredNodeId || selectedNodeId;
+
+    // Build a set of hidden attribute node IDs for link filtering
+    const hiddenNodeIds = new Set<string>();
+
+    // Update attribute node visibility based on LOD
+    nodeSelectionRef.current.each(function(d: GraphNode) {
+      if (d.type !== NodeType.ATTRIBUTE) return;
+
+      const nodeGroup = d3.select(this);
+      const isActive = d.id === focusNodeId;
+      const style = getNodeVisualStyle(d, zoomK, isActive);
+
+      if (!style.visible) {
+        hiddenNodeIds.add(d.id);
+      }
+
+      // Hide or show the entire node group
+      nodeGroup
+        .transition()
+        .duration(150)
+        .style('opacity', style.visible ? style.opacity : 0)
+        .style('pointer-events', style.visible ? 'auto' : 'none');
+    });
+
+    // Update link visibility - hide links connected to hidden attribute nodes
+    linkSelectionRef.current.each(function(d: GraphLink) {
+      const link = d3.select(this);
+      const sourceId = typeof d.source === 'object' ? (d.source as GraphNode).id : d.source;
+      const targetId = typeof d.target === 'object' ? (d.target as GraphNode).id : d.target;
+
+      // If either end is a hidden attribute node, hide this link
+      const shouldHide = hiddenNodeIds.has(sourceId) || hiddenNodeIds.has(targetId);
+
+      link
+        .transition()
+        .duration(150)
+        .style('opacity', shouldHide ? 0 : null); // null restores default
+    });
+
+    // Update label visibility based on zoom-aware LOD
+    labelGroupRef.current.each(function(d: GraphNode) {
+      const group = d3.select(this);
+      const isActive = d.id === focusNodeId;
+      const style = getNodeVisualStyle(d, zoomK, isActive);
+
+      // For attributes: visible === labelVisible (invariant)
+      // For others: use labelVisible
+      const shouldShowLabel = d.type === NodeType.ATTRIBUTE ? style.visible : style.labelVisible;
+
+      group.transition()
+        .duration(150)
+        .attr('opacity', shouldShowLabel ? 1 : 0);
+
+      // Update font size
+      group.select('text')
+        .transition()
+        .duration(150)
+        .style('font-size', `${style.fontSize}px`);
+    });
+
+  }, [zoomK, hoveredNodeId, selectedNodeId]);
 
   const handleBgClick = () => {
     onNodeSelect(null);
