@@ -81,19 +81,20 @@ export async function createImageWithAttributes(
 
     const imageNode = imageResult.records[0].get('i').properties;
 
-    // Create or link attributes
+    // Create or link attributes with canonical flag
     for (const attr of analysis.attributes) {
       await tx.run(
         `
         MATCH (i:Image {id: $imageId})
         MERGE (a:Attribute {type: $type, value: $value})
-        CREATE (i)-[:HAS_ATTRIBUTE {confidence: $confidence}]->(a)
+        CREATE (i)-[:HAS_ATTRIBUTE {confidence: $confidence, canonical: $canonical}]->(a)
         `,
         {
           imageId,
           type: attr.type,
           value: attr.value,
           confidence: attr.confidence,
+          canonical: attr.canonical ?? false,
         }
       );
     }
@@ -115,6 +116,7 @@ export async function createImageWithAttributes(
  */
 export async function getUserEgoNetwork(userId: string): Promise<GraphData> {
   return await runReadTransaction(async (tx) => {
+    // Modified query to return relationship data with node IDs explicitly
     const result = await tx.run(
       `
       MATCH (u:User {id: $userId})
@@ -128,9 +130,9 @@ export async function getUserEgoNetwork(userId: string): Promise<GraphData> {
              collect(DISTINCT a) as attributes,
              collect(DISTINCT similar) as similarImages,
              collect(DISTINCT similarAttr) as similarAttributes,
-             collect(DISTINCT uploadRel) as uploadRels,
-             collect(DISTINCT attrRel) as attrRels,
-             collect(DISTINCT simRel) as simRels
+             collect(DISTINCT {imageId: i.id}) as uploadRelData,
+             collect(DISTINCT {imageId: i.id, attrType: a.type, attrValue: a.value, confidence: attrRel.confidence, canonical: attrRel.canonical}) as attrRelData,
+             collect(DISTINCT {img1: i.id, img2: similar.id, similarity: simRel.similarity}) as simRelData
       `,
       { userId }
     );
@@ -143,6 +145,7 @@ export async function getUserEgoNetwork(userId: string): Promise<GraphData> {
     const nodes: GraphNode[] = [];
     const edges: GraphEdge[] = [];
     const nodeIds = new Set<string>();
+    const edgeIds = new Set<string>();
 
     // Add user node
     const user = record.get('u');
@@ -220,49 +223,64 @@ export async function getUserEgoNetwork(userId: string): Promise<GraphData> {
       }
     });
 
-    // Add UPLOADED relationships
-    const uploadRels = record.get('uploadRels');
-    uploadRels.forEach((rel: any, idx: number) => {
-      if (rel && rel.end && rel.end.properties) {
-        edges.push({
-          id: `upload-${idx}`,
-          type: 'UPLOADED',
-          source: userId,
-          target: rel.end.properties.id,
-          properties: {},
-        });
+    // Add UPLOADED relationships from extracted data
+    const uploadRelData = record.get('uploadRelData');
+    uploadRelData.forEach((data: any, idx: number) => {
+      if (data && data.imageId) {
+        const edgeId = `upload-${userId}-${data.imageId}`;
+        if (!edgeIds.has(edgeId)) {
+          edges.push({
+            id: `upload-${idx}`,
+            type: 'UPLOADED',
+            source: userId,
+            target: data.imageId,
+            properties: {},
+          });
+          edgeIds.add(edgeId);
+        }
       }
     });
 
-    // Add HAS_ATTRIBUTE relationships
-    const attrRels = record.get('attrRels');
-    attrRels.forEach((rel: any, idx: number) => {
-      if (rel && rel.start && rel.end && rel.start.properties && rel.end.properties) {
-        edges.push({
-          id: `attr-${idx}`,
-          type: 'HAS_ATTRIBUTE',
-          source: rel.start.properties.id,
-          target: `${rel.end.properties.type}:${rel.end.properties.value}`,
-          properties: {
-            confidence: rel.properties.confidence,
-          },
-        });
+    // Add HAS_ATTRIBUTE relationships from extracted data
+    const attrRelData = record.get('attrRelData');
+    attrRelData.forEach((data: any, idx: number) => {
+      if (data && data.imageId && data.attrType && data.attrValue) {
+        const targetId = `${data.attrType}:${data.attrValue}`;
+        const edgeId = `attr-${data.imageId}-${targetId}`;
+        if (!edgeIds.has(edgeId)) {
+          edges.push({
+            id: `attr-${idx}`,
+            type: 'HAS_ATTRIBUTE',
+            source: data.imageId,
+            target: targetId,
+            properties: {
+              confidence: data.confidence || 0.9,
+              canonical: data.canonical ?? false,
+            },
+          });
+          edgeIds.add(edgeId);
+        }
       }
     });
 
-    // Add SIMILAR_TO relationships
-    const simRels = record.get('simRels');
-    simRels.forEach((rel: any, idx: number) => {
-      if (rel && rel.start && rel.end && rel.start.properties && rel.end.properties) {
-        edges.push({
-          id: `sim-${idx}`,
-          type: 'SIMILAR_TO',
-          source: rel.start.properties.id,
-          target: rel.end.properties.id,
-          properties: {
-            similarity: rel.properties.similarity,
-          },
-        });
+    // Add SIMILAR_TO relationships from extracted data
+    const simRelData = record.get('simRelData');
+    simRelData.forEach((data: any, idx: number) => {
+      if (data && data.img1 && data.img2) {
+        const edgeId = `sim-${data.img1}-${data.img2}`;
+        const reverseEdgeId = `sim-${data.img2}-${data.img1}`;
+        if (!edgeIds.has(edgeId) && !edgeIds.has(reverseEdgeId)) {
+          edges.push({
+            id: `sim-${idx}`,
+            type: 'SIMILAR_TO',
+            source: data.img1,
+            target: data.img2,
+            properties: {
+              similarity: data.similarity,
+            },
+          });
+          edgeIds.add(edgeId);
+        }
       }
     });
 
@@ -370,6 +388,7 @@ export async function getGlobalGraphSample(
               target: nodeId,
               properties: {
                 confidence: attrData.rel?.properties?.confidence || 0.9,
+                canonical: attrData.rel?.properties?.canonical ?? false,
               },
             });
           }

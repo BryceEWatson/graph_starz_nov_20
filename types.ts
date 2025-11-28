@@ -23,6 +23,30 @@ export enum NodeType {
   MUSE_STAR = 'MUSE_STAR',
 }
 
+/**
+ * Raw attribute data from backend (before normalization)
+ */
+export interface RawAttribute {
+  /** Dimension/id, e.g. "style", "mood", "subject", "color", etc. */
+  type: string;
+  /** Human-facing value label, e.g. "painterly_fantasy", "regal". */
+  value: string;
+  /** Optional confidence score from 0–1. */
+  confidence?: number;
+  /** Source of the attribute: 'ai' (Gemini) or 'user' (future manual editing). */
+  source?: 'ai' | 'user';
+  /** True if this is a primary/canonical attribute for overlap & connectivity. */
+  canonical?: boolean;
+}
+
+/**
+ * Normalized attribute with stable ID for use in frontend components
+ */
+export interface AttributeChip extends RawAttribute {
+  /** Stable canonical id, e.g. "style:painterly_fantasy". */
+  id: string;
+}
+
 export interface UserProfile {
   id: string;
   name: string;
@@ -49,7 +73,12 @@ export interface GraphNode extends d3.SimulationNodeDatum {
   // Extended properties
   description?: string;
   timestamp?: number;
-  attributes?: string[];
+  /** Typed attributes attached to this node (usually image nodes). */
+  attributes?: AttributeChip[];
+  /** For ATTRIBUTE nodes only: the underlying dimension type (style, mood, etc.) */
+  attributeType?: string;
+  /** For ATTRIBUTE nodes only: whether this attribute value is canonical. */
+  attributeIsCanonical?: boolean;
   // Muse Star specific
   targetAttributes?: Array<{ type: string; value: string }>;
   attributeGap?: string;
