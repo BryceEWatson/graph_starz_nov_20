@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { UserProfile, AuthStatus } from '../types';
-import { exchangeGoogleCode, validateToken, logout as logoutApi, BackendUser, joinWaitlist as joinWaitlistApi } from '../services/authService';
+import { exchangeGoogleCode, validateToken, logout as logoutApi, BackendUser, joinWaitlist as joinWaitlistApi, AuthError } from '../services/authService';
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -123,13 +123,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setAuthStatus(AuthStatus.UNAUTHENTICATED);
           }
         } else {
-          // Token invalid
+          // Token explicitly invalid - clear it
           localStorage.removeItem(TOKEN_KEY);
           setAuthStatus(AuthStatus.UNAUTHENTICATED);
         }
       } catch (error) {
-        localStorage.removeItem(TOKEN_KEY);
-        setAuthStatus(AuthStatus.UNAUTHENTICATED);
+        // Only clear token on explicit auth errors (401/403)
+        // Network errors should preserve the token for retry
+        if (error instanceof AuthError && (error.status === 401 || error.status === 403)) {
+          localStorage.removeItem(TOKEN_KEY);
+          setAuthStatus(AuthStatus.UNAUTHENTICATED);
+        } else {
+          // Backend unavailable or network error - keep token for next page load
+          console.warn('Session validation failed (backend may be unavailable), keeping token for retry');
+          setAuthStatus(AuthStatus.UNAUTHENTICATED);
+        }
       }
     };
 
