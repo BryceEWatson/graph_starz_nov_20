@@ -1,4 +1,12 @@
 import { getVisionModel } from './geminiClient.js';
+import { Storage } from '@google-cloud/storage';
+import { config } from '../config/env.js';
+
+// GCS client for reading images (uses service account credentials)
+const storage = new Storage({
+  projectId: config.gcs.projectId,
+});
+const bucket = storage.bucket(config.gcs.bucket);
 
 export interface ImageAnalysis {
   title: string;
@@ -12,11 +20,11 @@ export interface ImageAnalysis {
 
 /**
  * Analyze image using Gemini Vision
- * @param imageUrl - Public URL of the image to analyze
+ * @param gcsPath - GCS path of the image (e.g., 'images/uuid.jpg')
  * @param contentType - MIME type of the image (e.g., 'image/jpeg', 'image/png')
  */
 export async function analyzeImage(
-  imageUrl: string,
+  gcsPath: string,
   contentType: string = 'image/jpeg'
 ): Promise<ImageAnalysis> {
   const prompt = `Analyze this image and provide:
@@ -43,7 +51,7 @@ Format as JSON:
     {
       inlineData: {
         mimeType: contentType,
-        data: await fetchImageAsBase64(imageUrl),
+        data: await fetchImageFromGCS(gcsPath),
       },
     },
     prompt,
@@ -73,10 +81,11 @@ Format as JSON:
 }
 
 /**
- * Fetch image and convert to base64
+ * Fetch image from GCS and convert to base64
+ * Uses service account credentials to read from private bucket
  */
-async function fetchImageAsBase64(url: string): Promise<string> {
-  const response = await fetch(url);
-  const buffer = await response.arrayBuffer();
-  return Buffer.from(buffer).toString('base64');
+async function fetchImageFromGCS(gcsPath: string): Promise<string> {
+  const file = bucket.file(gcsPath);
+  const [buffer] = await file.download();
+  return buffer.toString('base64');
 }

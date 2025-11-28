@@ -192,18 +192,21 @@ graph-starz/
 │   │   │   └── neo4j.ts            # ✅ Database connection
 │   │   ├── middleware/
 │   │   │   ├── errorMiddleware.ts  # ✅ Error handling
-│   │   │   └── authMiddleware.ts   # ⏳ See IMPLEMENTATION_GUIDE
+│   │   │   └── authMiddleware.ts   # ✅ JWT auth middleware
 │   │   ├── routes/
 │   │   │   ├── health.ts           # ✅ Health checks
-│   │   │   ├── auth.ts             # ⏳ See IMPLEMENTATION_GUIDE
-│   │   │   ├── uploads.ts          # ⏳ See IMPLEMENTATION_GUIDE
-│   │   │   └── graph.ts            # ⏳ See IMPLEMENTATION_GUIDE
+│   │   │   ├── auth.ts             # ✅ Google OAuth, JWT, waitlist
+│   │   │   ├── uploads.ts          # ✅ Signed URLs, AI analysis
+│   │   │   ├── graph.ts            # ✅ Ego network, global graph
+│   │   │   └── museStars.ts        # ✅ Muse Star detection, prompts
 │   │   ├── services/
-│   │   │   ├── authService.ts      # ⏳ See IMPLEMENTATION_GUIDE
-│   │   │   ├── storageService.ts   # ⏳ See IMPLEMENTATION_GUIDE
-│   │   │   ├── aiService.ts        # ⏳ See IMPLEMENTATION_GUIDE
-│   │   │   ├── graphService.ts     # ⏳ See IMPLEMENTATION_GUIDE
-│   │   │   └── similarityService.ts# ⏳ See IMPLEMENTATION_GUIDE
+│   │   │   ├── authService.ts      # ✅ OAuth token exchange, whitelist
+│   │   │   ├── storageService.ts   # ✅ GCS signed URLs, thumbnails
+│   │   │   ├── aiService.ts        # ✅ Gemini image analysis
+│   │   │   ├── graphService.ts     # ✅ Neo4j queries, graph creation
+│   │   │   ├── museStarService.ts  # ✅ Gap detection
+│   │   │   ├── aiMuseService.ts    # ✅ Prompt generation
+│   │   │   └── similarityService.ts# ⏳ Phase 4 (future)
 │   │   └── utils/
 │   │       └── logger.ts           # ✅ Winston logging
 │   │
@@ -215,8 +218,8 @@ graph-starz/
 ```
 
 **Legend**:
-- ✅ = Already implemented
-- ⏳ = Implementation code available in IMPLEMENTATION_GUIDE.md
+- ✅ = Implemented and working
+- ⏳ = Future phase (not yet implemented)
 
 ---
 
@@ -272,6 +275,7 @@ See `backend/.env.example` for complete reference.
 4. ❌ **Don't create new error patterns** - Use ApiError from errorMiddleware
 5. ❌ **Don't bypass validation** - Use Zod schemas like existing routes
 6. ❌ **Don't skip documentation** - Always check IMPLEMENTATION_GUIDE first
+7. ❌ **Don't change default local ports** - Kill conflicting processes instead
 
 ---
 

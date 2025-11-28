@@ -445,7 +445,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { config } from '../config/env.js';
 
 const genAI = new GoogleGenerativeAI(config.gemini.apiKey);
-const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+const model = genAI.getGenerativeModel({ model: 'gemini-3-pro-preview' });
 
 export interface ImageAnalysis {
   title: string;
@@ -1106,7 +1106,7 @@ import { runReadTransaction } from '../config/neo4j.js';
 import { MuseStar } from './museStarService.js';
 
 const genAI = new GoogleGenerativeAI(config.gemini.apiKey);
-const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+const model = genAI.getGenerativeModel({ model: 'gemini-3-pro-preview' });
 
 export interface PromptSuggestion {
   id: string;
@@ -1425,6 +1425,128 @@ logger.debug('Debug info', { data });
 
 ---
 
+## Frontend Implementation (Complete)
+
+The frontend is now fully integrated with the backend APIs. This section documents the key integration points.
+
+### Services Layer
+
+#### Upload Service (`services/uploadService.ts`)
+
+Handles the complete upload flow:
+```typescript
+// 1. Initialize upload (get signed URL)
+const initResponse = await initUpload(file, token);
+
+// 2. Upload to GCS
+await uploadToGCS(file, initResponse.uploadUrl, initResponse.contentType);
+
+// 3. Complete upload (trigger AI analysis)
+const result = await completeUpload(initResponse.imageId, initResponse.gcsPath, token);
+```
+
+#### Graph Service (`services/graphService.ts`)
+
+Fetches graph data from backend:
+```typescript
+// Fetch user's ego network
+const graph = await fetchEgoGraph(token);
+
+// Fetch global graph sample
+const globalGraph = await fetchGlobalGraph(limit, skip);
+```
+
+#### Muse Star Service (`services/museStarService.ts`)
+
+Handles Muse Star fetching and prompt generation:
+```typescript
+// Fetch Muse Stars for user
+const { museStars } = await fetchMuseStars(token);
+
+// Generate prompts for a Muse Star
+const { prompts } = await generatePrompts(museStar, token);
+```
+
+### Context Management
+
+#### GraphContext (`contexts/GraphContext.tsx`)
+
+Manages graph state and loading:
+```typescript
+const { graphData, refreshGraph, museStars, isLoading } = useGraph();
+
+// Converts backend GraphData to frontend format
+// Merges Muse Stars into the graph nodes
+// Handles view mode switching (ego vs global)
+```
+
+### Components
+
+#### UploadModal (`components/UploadModal.tsx`)
+- Uses real upload services (no more mock data)
+- Shows progress through upload → analysis → graph creation
+- Calls `refreshGraph()` after successful upload
+
+#### GraphCanvas (`components/GraphCanvas.tsx`)
+- Renders Muse Stars with distinct styling:
+  - Smaller radius, dashed amber outline
+  - Star emoji (✨) icon
+  - Lower opacity with glow effect
+- Tooltip on hover: "Muse Star – a suggested point in your map..."
+- Click handler opens MuseStarPanel
+
+#### MuseStarPanel (`components/MuseStarPanel.tsx`)
+- Drawer that opens when Muse Star is clicked
+- Fetches prompts from `/muse-stars/prompts`
+- Shows 2-3 prompts with labels (Safe, Bold, Experimental)
+- Copy-to-clipboard functionality
+
+### App Integration (`App.tsx`)
+
+```typescript
+// Wraps app with providers
+<GoogleOAuthProvider clientId={clientId}>
+  <AuthProvider>
+    <GraphProvider>  {/* Handles graph data fetching */}
+      <AppContent />
+    </GraphProvider>
+  </AuthProvider>
+</GoogleOAuthProvider>
+
+// Handles node selection
+const handleNodeSelect = useCallback((node: GraphNode | null) => {
+  if (node?.type === NodeType.MUSE_STAR) {
+    setSelectedMuseStar(node);  // Opens MuseStarPanel
+  } else {
+    setSelectedNodeId(node?.id);  // Opens Sidebar
+  }
+}, []);
+```
+
+### Data Flow
+
+**Upload Flow:**
+1. User selects image in UploadModal
+2. `initUpload()` → GET signed URL from `/uploads/init`
+3. `uploadToGCS()` → Direct upload to GCS
+4. `completeUpload()` → POST to `/uploads/complete` (triggers Gemini analysis + Neo4j writes)
+5. `refreshGraph()` → Refetch `/graph/ego` to show new image
+
+**Graph Rendering Flow:**
+1. On auth, GraphContext calls `/graph/ego` and `/muse-stars/ego` in parallel
+2. Converts backend nodes/edges to frontend GraphNode/GraphLink format
+3. Merges Muse Stars into nodes array
+4. GraphCanvas renders with D3.js force simulation
+
+**Muse Star Interaction Flow:**
+1. User clicks Muse Star node in GraphCanvas
+2. App.tsx sets `selectedMuseStar` state
+3. MuseStarPanel opens, calls `/muse-stars/prompts`
+4. Displays Safe/Bold/Experimental prompts
+5. User can copy prompts to use with image generators
+
+---
+
 ## Next Steps
 
 After implementing these phases:
@@ -1434,5 +1556,28 @@ After implementing these phases:
 3. **Add WebSockets** - Real-time graph updates
 4. **Add Metrics** - Prometheus/Grafana monitoring
 5. **Add Admin Panel** - Content moderation
+
+### Storage Layer Improvements
+
+The current MVP uses a public GCS bucket for image storage. This is appropriate for Graph Starz since images are meant to be shared, but future iterations should consider:
+
+1. **Cloud CDN with Caching** - Add Google Cloud CDN in front of the GCS bucket to:
+   - Reduce latency for global users
+   - Lower bandwidth costs
+   - Provide edge caching for frequently accessed images
+
+2. **Referrer Policies** - Implement signed cookies or referrer validation to:
+   - Prevent hotlinking from unauthorized domains
+   - Track image access patterns
+   - Enable analytics on image views
+
+3. **Rate Limiting at CDN Level** - Configure CDN rate limits to:
+   - Prevent abuse and scraping
+   - Protect against DDoS attacks
+   - Control costs from unexpected traffic spikes
+
+4. **Signed URLs for Sensitive Content** (if needed):
+   - Draft/private images could use time-limited signed URLs
+   - Premium features could use authenticated access
 
 For full API reference, see [GRAPH_STARZ_MVP.md](./GRAPH_STARZ_MVP.md)
