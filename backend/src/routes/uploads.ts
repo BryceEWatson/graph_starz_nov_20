@@ -61,12 +61,20 @@ uploadsRouter.post('/init', async (req: Request, res: Response) => {
 /**
  * POST /uploads/complete
  * Trigger AI analysis and create graph nodes
+ *
+ * Security: validateAndConsumePendingUpload ensures imageId/gcsPath were issued
+ * by /init for this specific user. Prevents spoofed completions.
+ *
+ * TODO (future hardening):
+ * - Verify the file actually exists in GCS before processing
+ * - Add rate limiting per user
+ * - Consider file size validation
  */
 uploadsRouter.post('/complete', async (req: Request, res: Response) => {
   const { imageId, gcsPath } = completeUploadSchema.parse(req.body);
   const userId = req.user!.id;
 
-  // Validate that this upload was initiated by this user
+  // Validate that this upload was initiated by this user (anti-spoofing)
   const validation = await validateAndConsumePendingUpload(imageId, gcsPath, userId);
 
   if (!validation.valid) {
@@ -76,11 +84,11 @@ uploadsRouter.post('/complete', async (req: Request, res: Response) => {
   // Use the content type from the validated pending upload (not from client)
   const contentType = validation.contentType!;
 
-  // Get public URL
+  // Get public URL for storing in the database
   const imageUrl = getPublicUrl(gcsPath);
 
-  // Analyze image with Gemini (pass actual content type)
-  const analysis = await analyzeImage(imageUrl, contentType);
+  // Analyze image with Gemini (pass gcsPath to read from private bucket)
+  const analysis = await analyzeImage(gcsPath, contentType);
 
   // Generate thumbnail (for MVP, same as main image)
   const thumbnailPath = await generateThumbnail(gcsPath);

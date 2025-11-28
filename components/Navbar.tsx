@@ -104,7 +104,7 @@ const Navbar: React.FC<NavbarProps> = ({
                 onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
             >
                 {user?.avatar ? (
-                    <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+                    <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                 ) : (
                     <div className="w-full h-full flex items-center justify-center bg-indigo-600 text-white font-bold text-xs">
                     {user?.name.charAt(0)}

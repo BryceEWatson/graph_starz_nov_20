@@ -71,44 +71,58 @@ graph-starz/
 ├── backend/
 │   ├── src/
 │   │   ├── config/
-│   │   │   ├── env.ts              # ✅ Environment variables (done)
-│   │   │   └── neo4j.ts            # ✅ Neo4j connection (done)
+│   │   │   ├── env.ts              # ✅ Environment variables
+│   │   │   └── neo4j.ts            # ✅ Neo4j connection
 │   │   ├── middleware/
-│   │   │   ├── errorMiddleware.ts  # ✅ Error handling (done)
-│   │   │   └── authMiddleware.ts   # ⏳ Phase 1 (to do)
+│   │   │   ├── errorMiddleware.ts  # ✅ Error handling
+│   │   │   └── authMiddleware.ts   # ✅ JWT auth middleware
 │   │   ├── routes/
-│   │   │   ├── health.ts           # ✅ Health check (done)
-│   │   │   ├── auth.ts             # ⏳ Phase 1 (to do)
-│   │   │   ├── uploads.ts          # ⏳ Phase 2 (to do)
-│   │   │   ├── graph.ts            # ⏳ Phase 3 (to do)
-│   │   │   └── museStars.ts        # ⏳ Phase 5 (to do)
+│   │   │   ├── health.ts           # ✅ Health check
+│   │   │   ├── auth.ts             # ✅ Google OAuth, JWT, waitlist
+│   │   │   ├── uploads.ts          # ✅ Signed URLs, AI analysis
+│   │   │   ├── graph.ts            # ✅ Ego network, global graph
+│   │   │   └── museStars.ts        # ✅ Muse Star detection, prompts
 │   │   ├── services/
-│   │   │   ├── authService.ts      # ⏳ Phase 1 (to do)
-│   │   │   ├── storageService.ts   # ⏳ Phase 2 (to do)
-│   │   │   ├── aiService.ts        # ⏳ Phase 2 (to do)
-│   │   │   ├── graphService.ts     # ⏳ Phase 2-3 (to do)
-│   │   │   ├── similarityService.ts# ⏳ Phase 4 (to do)
-│   │   │   ├── museStarService.ts  # ⏳ Phase 5 (to do)
-│   │   │   └── aiMuseService.ts    # ⏳ Phase 5 (to do)
+│   │   │   ├── authService.ts      # ✅ OAuth token exchange, whitelist
+│   │   │   ├── storageService.ts   # ✅ GCS signed URLs, thumbnails
+│   │   │   ├── aiService.ts        # ✅ Gemini image analysis
+│   │   │   ├── graphService.ts     # ✅ Neo4j queries, graph creation
+│   │   │   ├── similarityService.ts# ⏳ Phase 4 (future)
+│   │   │   ├── museStarService.ts  # ✅ Gap detection
+│   │   │   └── aiMuseService.ts    # ✅ Prompt generation
 │   │   ├── utils/
-│   │   │   └── logger.ts           # ✅ Winston logging (done)
-│   │   └── index.ts                # ✅ Express server (done)
+│   │   │   └── logger.ts           # ✅ Winston logging
+│   │   └── index.ts                # ✅ Express server
 │   │
 │   ├── scripts/
-│   │   ├── init-neo4j.cypher       # ✅ Database schema (done)
-│   │   └── seed-dev-data.cypher    # ✅ Sample data (done)
+│   │   ├── init-neo4j.cypher       # ✅ Database schema
+│   │   └── seed-dev-data.cypher    # ✅ Sample data
 │   │
-│   ├── .env                        # ✅ Configured (done)
-│   ├── .env.example                # ✅ Template (done)
-│   ├── package.json                # ✅ Dependencies (done)
-│   └── tsconfig.json               # ✅ TypeScript config (done)
+│   ├── tests/
+│   │   └── unit/                   # ✅ Unit tests (vitest)
+│   │
+│   ├── .env                        # ✅ Configured
+│   ├── .env.example                # ✅ Template
+│   ├── package.json                # ✅ Dependencies
+│   └── tsconfig.json               # ✅ TypeScript config
 │
-└── frontend/                       # ✅ React app (already built)
-    ├── components/
-    │   ├── GraphCanvas.tsx
-    │   ├── UploadModal.tsx
-    │   └── ...
-    └── ...
+├── services/                       # ✅ Frontend API services
+│   ├── authService.ts              # ✅ Auth API calls
+│   ├── uploadService.ts            # ✅ Upload flow (init → GCS → complete)
+│   ├── graphService.ts             # ✅ Graph API calls
+│   └── museStarService.ts          # ✅ Muse Star API calls
+│
+├── contexts/                       # ✅ React contexts
+│   ├── AuthContext.tsx             # ✅ Auth state management
+│   └── GraphContext.tsx            # ✅ Graph data + refresh
+│
+├── components/                     # ✅ React components
+│   ├── GraphCanvas.tsx             # ✅ D3 graph + Muse Stars
+│   ├── UploadModal.tsx             # ✅ Real upload flow
+│   ├── MuseStarPanel.tsx           # ✅ Prompt drawer
+│   └── ...
+│
+└── App.tsx                         # ✅ Provider wiring
 ```
 
 ## 🚀 Quick Commands

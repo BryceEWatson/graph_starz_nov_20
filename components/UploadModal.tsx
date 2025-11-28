@@ -1,19 +1,23 @@
 import React, { useState, useRef } from 'react';
 import { Upload, X, CheckCircle, AlertCircle, Loader2, BrainCircuit, Share2 } from 'lucide-react';
-import { UploadStatus, AnalysisResult } from '../types';
-import { analyzeImageWithGemini } from '../services/geminiService';
+import { UploadStatus } from '../types';
+import { initUpload, uploadToGCS, completeUpload } from '../services/uploadService';
+import { useGraph } from '../contexts/GraphContext';
+
+const TOKEN_KEY = 'graph_starz_jwt_token';
 
 interface UploadModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onUploadComplete: (file: File, result: AnalysisResult) => void;
+  onSuccess?: () => void;
 }
 
-const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onUploadComplete }) => {
+const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuccess }) => {
+  const { refreshGraph } = useGraph();
   const [status, setStatus] = useState<UploadStatus>({ stage: 'IDLE', progress: 0, message: '' });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [uploadedImageData, setUploadedImageData] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!isOpen) return null;
@@ -24,61 +28,68 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onUploadComp
       setSelectedFile(file);
       setPreviewUrl(URL.createObjectURL(file));
       setStatus({ stage: 'IDLE', progress: 0, message: '' });
-      setAnalysisResult(null);
+      setUploadedImageData(null);
     }
   };
 
   const startUploadProcess = async () => {
     if (!selectedFile) return;
 
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) {
+      setStatus({ stage: 'ERROR', progress: 0, message: 'Authentication required' });
+      return;
+    }
+
     try {
-      // 1. Validate
-      setStatus({ stage: 'VALIDATING', progress: 10, message: 'Verifying file format...' });
-      await new Promise(resolve => setTimeout(resolve, 600));
+      // 1. Initialize upload
+      setStatus({ stage: 'VALIDATING', progress: 10, message: 'Initializing upload...' });
+      const initResponse = await initUpload(selectedFile, token);
 
-      // 2. Optimize
-      setStatus({ stage: 'OPTIMIZING', progress: 30, message: 'Generating WebP variants...' });
-      await new Promise(resolve => setTimeout(resolve, 800));
+      // 2. Upload to GCS
+      setStatus({ stage: 'OPTIMIZING', progress: 30, message: 'Uploading to cloud storage...' });
+      await uploadToGCS(selectedFile, initResponse.uploadUrl, initResponse.contentType);
 
-      // 3. Gemini Analysis
-      setStatus({ stage: 'ANALYZING', progress: 50, message: 'Gemini is analyzing content...' });
-      
-      // Convert to base64 for Gemini
-      const reader = new FileReader();
-      reader.readAsDataURL(selectedFile);
-      
-      reader.onloadend = async () => {
-        try {
-          const base64data = reader.result as string;
-          const base64Content = base64data.split(',')[1];
-          
-          // Real (or simulated) AI Call
-          const result = await analyzeImageWithGemini(base64Content, selectedFile.type);
-          
-          setAnalysisResult(result);
-          setStatus({ stage: 'SAVING', progress: 80, message: 'Updating graph structure...' });
-          await new Promise(resolve => setTimeout(resolve, 600));
+      // 3. Complete upload (triggers AI analysis)
+      setStatus({ stage: 'ANALYZING', progress: 50, message: 'AI Muse is analyzing your image...' });
+      const completeResponse = await completeUpload(
+        initResponse.imageId,
+        initResponse.gcsPath,
+        token
+      );
 
-          setStatus({ stage: 'COMPLETE', progress: 100, message: 'Upload successful!' });
-        } catch (err) {
-          throw err;
-        }
-      };
-    } catch (error) {
-      setStatus({ stage: 'ERROR', progress: 0, message: 'Upload failed. Please try again.' });
+      setUploadedImageData(completeResponse);
+      setStatus({ stage: 'SAVING', progress: 80, message: 'Adding to your map...' });
+      await new Promise((resolve) => setTimeout(resolve, 600));
+
+      setStatus({ stage: 'COMPLETE', progress: 100, message: 'Upload successful!' });
+    } catch (error: any) {
+      setStatus({
+        stage: 'ERROR',
+        progress: 0,
+        message: error.message || 'Upload failed. Please try again.',
+      });
     }
   };
 
-  const handlePublish = () => {
-    if (selectedFile && analysisResult) {
-      onUploadComplete(selectedFile, analysisResult);
+  const handlePublish = async () => {
+    if (uploadedImageData) {
+      // Refresh the graph to show the new image
+      await refreshGraph();
+
+      // Call success callback if provided
+      if (onSuccess) {
+        onSuccess();
+      }
+
       onClose();
+
       // Reset state after close
       setTimeout(() => {
         setSelectedFile(null);
         setPreviewUrl(null);
         setStatus({ stage: 'IDLE', progress: 0, message: '' });
-        setAnalysisResult(null);
+        setUploadedImageData(null);
       }, 500);
     }
   };
@@ -135,8 +146,13 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onUploadComp
                 <div className="relative rounded-lg overflow-hidden aspect-square border border-gray-700 bg-black">
                   {previewUrl && <img src={previewUrl} alt="Preview" className="w-full h-full object-contain" />}
                 </div>
-                <button 
-                  onClick={() => { setSelectedFile(null); setStatus({ stage: 'IDLE', progress: 0, message: '' }); }}
+                <button
+                  onClick={() => {
+                    if (previewUrl) URL.revokeObjectURL(previewUrl);
+                    setSelectedFile(null);
+                    setPreviewUrl(null);
+                    setStatus({ stage: 'IDLE', progress: 0, message: '' });
+                  }}
                   className="text-sm text-red-400 hover:text-red-300 flex items-center gap-1"
                   disabled={status.stage !== 'IDLE' && status.stage !== 'COMPLETE' && status.stage !== 'ERROR'}
                 >
@@ -170,14 +186,14 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onUploadComp
                     </div>
                     {renderProgressBar()}
 
-                    {analysisResult && (
+                    {uploadedImageData && (
                       <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700 mt-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        <h3 className="font-bold text-white mb-1">{analysisResult.title}</h3>
-                        <p className="text-xs text-gray-400 mb-3">{analysisResult.description}</p>
+                        <h3 className="font-bold text-white mb-1">{uploadedImageData.analysis.title}</h3>
+                        <p className="text-xs text-gray-400 mb-3">{uploadedImageData.analysis.description}</p>
                         <div className="flex flex-wrap gap-2">
-                          {analysisResult.attributes.map((attr, i) => (
+                          {uploadedImageData.analysis.attributes.map((attr: any, i: number) => (
                             <span key={i} className="px-2 py-1 rounded-full bg-gray-700 text-xs text-blue-300 border border-gray-600">
-                              #{attr}
+                              #{attr.value}
                             </span>
                           ))}
                         </div>

@@ -20,13 +20,14 @@ export enum NodeType {
   USER = 'USER',
   IMAGE = 'IMAGE',
   ATTRIBUTE = 'ATTRIBUTE',
+  MUSE_STAR = 'MUSE_STAR',
 }
 
 export interface UserProfile {
   id: string;
   name: string;
   email: string;
-  avatar: string;
+  avatar?: string;
 }
 
 export enum AuthStatus {
@@ -49,6 +50,11 @@ export interface GraphNode extends d3.SimulationNodeDatum {
   description?: string;
   timestamp?: number;
   attributes?: string[];
+  // Muse Star specific
+  targetAttributes?: Array<{ type: string; value: string }>;
+  attributeGap?: string;
+  imageCount?: number;
+  nearbyImages?: string[];
   // D3 specific
   x?: number;
   y?: number;
@@ -59,7 +65,7 @@ export interface GraphNode extends d3.SimulationNodeDatum {
 export interface GraphLink extends d3.SimulationLinkDatum<GraphNode> {
   source: string | GraphNode;
   target: string | GraphNode;
-  type: 'UPLOADED' | 'HAS_ATTRIBUTE' | 'CONNECTED_TO';
+  type: 'UPLOADED' | 'HAS_ATTRIBUTE' | 'CONNECTED_TO' | 'SIMILAR_TO';
   strength: number;
 }
 

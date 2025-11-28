@@ -122,7 +122,7 @@ Graph Starz creates an interconnected network of users, images, and AI-generated
 - **Framework**: Express.js
 - **Database**: Neo4j (graph database)
 - **Storage**: Google Cloud Storage (image blobs)
-- **AI**: Google Gemini 2.5 Flash via @google/genai SDK
+- **AI**: Google Gemini 3 Pro via @google/genai SDK
 - **Auth**: Google OAuth 2.0 with JWT sessions
 
 ### Frontend Stack (Already Built)
@@ -169,7 +169,7 @@ Graph Starz creates an interconnected network of users, images, and AI-generated
 
 ### Phase 2: Upload Pipeline ✅
 - [x] Signed URL generation (storageService.ts)
-- [x] Gemini AI analysis (aiService.ts - using gemini-2.0-flash-exp)
+- [x] Gemini AI analysis (aiService.ts - using gemini-3-pro-preview)
 - [x] Attribute extraction (style, mood, subject, color)
 - [x] Graph persistence (graphService.ts - createImageWithAttributes)
 - [x] Upload routes (/uploads/init, /uploads/complete)
@@ -179,9 +179,9 @@ Graph Starz creates an interconnected network of users, images, and AI-generated
 - [x] Ego network queries (getUserEgoNetwork)
 - [x] Global graph queries (getGlobalGraphSample)
 - [x] Graph routes (/graph/ego, /graph/global)
-- [ ] Frontend integration with real graph data (TODO: replace INITIAL_GRAPH_DATA)
-- [ ] Real-time graph updates (TODO: after upload)
-- [ ] Interactive navigation (frontend exists, needs backend integration)
+- [x] Frontend integration with real graph data (GraphContext replaces INITIAL_GRAPH_DATA)
+- [x] Real-time graph updates (refreshGraph() called after upload)
+- [x] Interactive navigation (GraphCanvas uses backend data via GraphContext)
 - [ ] Similarity relationships (structure in place, calculation not yet implemented)
 
 ### Phase 4: Discovery Features (Future)
@@ -197,8 +197,8 @@ Graph Starz creates an interconnected network of users, images, and AI-generated
 - [x] Muse Star routes (/muse-stars/ego, /muse-stars/prompts)
 - [x] Context-aware prompt generation based on nearby images and target attributes
 - [x] Variety in prompts (Safe, Bold, Experimental)
-- [ ] Frontend visualization of Muse Stars (TODO)
-- [ ] Click interaction: Muse Star → Prompt drawer (TODO)
+- [x] Frontend visualization of Muse Stars (GraphCanvas renders with distinct amber styling)
+- [x] Click interaction: Muse Star → Prompt drawer (MuseStarPanel component)
 
 **Note**: Phase 5 is currently scoped to user ego networks. Board-based Muse Stars require implementing Board entity (Phase 4).
 

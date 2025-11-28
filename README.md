@@ -7,7 +7,7 @@ Graph Starz is a global graph index of AI-generated images, users, and attribute
 ## Features
 
 - **Living Map Visualization**: Interactive force-directed graph where creators are stars in a universe of AI images. Navigate the connections between users, images, and attributes.
-- **AI-Powered Understanding**: Gemini 2.5 Flash automatically analyzes images to extract titles, descriptions, and semantic attributes (style, mood, subject, color).
+- **AI-Powered Understanding**: Gemini 3 Pro automatically analyzes images to extract titles, descriptions, and semantic attributes (style, mood, subject, color).
 - **Muse Stars & Graph-Aware Suggestions**: The AI Muse identifies underexplored regions of your map and suggests prompts for images that could exist in model latent space but haven't been created yet.
 - **Semantic Connections**: Visualize how images relate through shared attributes, creating constellations of similar visual ideas.
 - **Secure Authentication**: Google OAuth sign-in with backend-enforced access control.
