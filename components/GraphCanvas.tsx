@@ -827,6 +827,7 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, onNodeSelect, selectedN
 
   // 3. Zoom-based LOD Effect (Runs whenever zoom level changes)
   // Hides non-visible attribute nodes AND their connected links
+  // Also applies zoom-aware node sizing
   useEffect(() => {
     if (!nodeSelectionRef.current || !labelGroupRef.current || !linkSelectionRef.current) return;
 
@@ -835,24 +836,73 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, onNodeSelect, selectedN
     // Build a set of hidden attribute node IDs for link filtering
     const hiddenNodeIds = new Set<string>();
 
-    // Update attribute node visibility based on LOD
+    // Update ALL nodes with zoom-aware sizing and visibility
     nodeSelectionRef.current.each(function(d: GraphNode) {
-      if (d.type !== NodeType.ATTRIBUTE) return;
-
       const nodeGroup = d3.select(this);
       const isActive = d.id === focusNodeId;
       const style = getNodeVisualStyle(d, zoomK, isActive);
 
-      if (!style.visible) {
-        hiddenNodeIds.add(d.id);
-      }
+      if (d.type === NodeType.ATTRIBUTE) {
+        // Track hidden attributes for link filtering
+        if (!style.visible) {
+          hiddenNodeIds.add(d.id);
+        }
 
-      // Hide or show the entire node group
-      nodeGroup
-        .transition()
-        .duration(150)
-        .style('opacity', style.visible ? style.opacity : 0)
-        .style('pointer-events', style.visible ? 'auto' : 'none');
+        // Update attribute node circle radius and visibility
+        nodeGroup.select('circle')
+          .transition()
+          .duration(150)
+          .attr('r', style.radius);
+
+        nodeGroup
+          .transition()
+          .duration(150)
+          .style('opacity', style.visible ? style.opacity : 0)
+          .style('pointer-events', style.visible ? 'auto' : 'none');
+
+      } else if (d.type === NodeType.MUSE_STAR) {
+        // Update Muse Star circle radius
+        nodeGroup.select('circle')
+          .transition()
+          .duration(150)
+          .attr('r', style.radius);
+
+      } else if (d.type === NodeType.IMAGE || d.type === NodeType.USER) {
+        // For image nodes, scale based on zoom-aware radius while preserving aspect ratio
+        const baseWidth = d.width || d.radius * 2;
+        const baseHeight = d.height || d.radius * 2;
+        const baseRadius = d.radius || 26;
+        const scale = style.radius / baseRadius;
+        const newWidth = baseWidth * scale;
+        const newHeight = baseHeight * scale;
+
+        // Update background rect
+        nodeGroup.selectAll('rect:not(.photo-border)')
+          .transition()
+          .duration(150)
+          .attr('x', -newWidth / 2)
+          .attr('y', -newHeight / 2)
+          .attr('width', newWidth)
+          .attr('height', newHeight);
+
+        // Update image
+        nodeGroup.select('image')
+          .transition()
+          .duration(150)
+          .attr('x', -newWidth / 2)
+          .attr('y', -newHeight / 2)
+          .attr('width', newWidth)
+          .attr('height', newHeight);
+
+        // Update photo border
+        nodeGroup.select('.photo-border')
+          .transition()
+          .duration(150)
+          .attr('x', -newWidth / 2)
+          .attr('y', -newHeight / 2)
+          .attr('width', newWidth)
+          .attr('height', newHeight);
+      }
     });
 
     // Update link visibility - hide links connected to hidden attribute nodes
@@ -870,7 +920,7 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, onNodeSelect, selectedN
         .style('opacity', shouldHide ? 0 : null); // null restores default
     });
 
-    // Update label visibility based on zoom-aware LOD
+    // Update label visibility and positioning based on zoom-aware LOD
     labelGroupRef.current.each(function(d: GraphNode) {
       const group = d3.select(this);
       const isActive = d.id === focusNodeId;
@@ -884,11 +934,39 @@ const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, onNodeSelect, selectedN
         .duration(150)
         .attr('opacity', shouldShowLabel ? 1 : 0);
 
-      // Update font size
+      // Calculate label offset based on zoom-aware node size
+      let labelDy: number;
+      if (d.type === NodeType.ATTRIBUTE) {
+        labelDy = style.radius + 18;
+      } else if (d.type === NodeType.MUSE_STAR) {
+        labelDy = style.radius + 18;
+      } else {
+        // Image/User nodes - use scaled height
+        const baseHeight = d.height || d.radius * 2;
+        const baseRadius = d.radius || 26;
+        const scale = style.radius / baseRadius;
+        labelDy = (baseHeight * scale) / 2 + 24;
+      }
+
+      // Update font size and position
       group.select('text')
         .transition()
         .duration(150)
+        .attr('dy', labelDy)
         .style('font-size', `${style.fontSize}px`);
+
+      // Update label background position
+      const text = group.select('text').node() as SVGTextElement | null;
+      if (text) {
+        const bbox = text.getBBox();
+        group.select('rect.label-bg')
+          .transition()
+          .duration(150)
+          .attr('x', bbox.x - 4)
+          .attr('y', bbox.y - 2)
+          .attr('width', bbox.width + 8)
+          .attr('height', bbox.height + 4);
+      }
     });
 
   }, [zoomK, hoveredNodeId, selectedNodeId]);
