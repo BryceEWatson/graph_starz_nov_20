@@ -34,32 +34,52 @@ function getNodeVisualStyle(
   const isMedium = k >= 0.5 && k < 1.2;
   const isClose = k >= 1.2;
 
-  // Base radii per type
-  let baseRadius =
-    node.type === NodeType.IMAGE
-      ? 26
-      : node.type === NodeType.USER
-      ? 22
-      : node.type === NodeType.MUSE_STAR
-      ? 20
-      : 12; // ATTRIBUTE
+  // Calculate radius with zoom compensation per node type
+  // Each type has different scaling behavior to optimize the overview vs detail experience
+  let radius: number;
 
-  // Alpha controls how much the node size compensates for zoom
-  // Higher alpha = more size compensation (stays larger when zoomed out)
-  const alpha =
-    node.type === NodeType.IMAGE || node.type === NodeType.USER
-      ? 0.35 // Key nodes stay more prominent
-      : node.type === NodeType.MUSE_STAR
-      ? 0.3
-      : 0.15; // Attribute nodes shrink more
+  if (node.type === NodeType.IMAGE) {
+    // Images get STRONGER inverse-zoom scaling so they stay readable at far zoom
+    // At far zoom, the overview should show clear thumbnails, not tiny specks
+    const baseRadius = 26;
+    const alpha = 0.6; // Higher alpha = more aggressive scaling when zoomed out
 
-  // Calculate radius with zoom compensation
-  let radius = baseRadius * Math.pow(1 / k, alpha);
-  radius = clamp(
-    radius,
-    node.type === NodeType.ATTRIBUTE ? 3 : 12, // Min radius
-    node.type === NodeType.IMAGE ? 40 : 32 // Max radius
-  );
+    let computed = baseRadius * Math.pow(1 / k, alpha);
+
+    // At far zoom, enforce a higher minimum so images are clearly visible
+    // At closer zooms, allow smaller but still clickable
+    const minRadius = isFar ? 28 : 18;
+    const maxRadius = 60; // Don't let thumbnails get too large at very far zoom
+
+    radius = clamp(computed, minRadius, maxRadius);
+
+  } else if (node.type === NodeType.USER) {
+    // Users scale similarly to images but slightly less aggressive
+    const baseRadius = 22;
+    const alpha = 0.5;
+
+    let computed = baseRadius * Math.pow(1 / k, alpha);
+    const minRadius = isFar ? 24 : 14;
+    const maxRadius = 50;
+
+    radius = clamp(computed, minRadius, maxRadius);
+
+  } else if (node.type === NodeType.MUSE_STAR) {
+    // Muse stars have moderate scaling
+    const baseRadius = 20;
+    const alpha = 0.3;
+
+    let computed = baseRadius * Math.pow(1 / k, alpha);
+    radius = clamp(computed, 12, 32);
+
+  } else {
+    // ATTRIBUTE nodes - minimal scaling, they're meant to be subtle
+    const baseRadius = 12;
+    const alpha = 0.15;
+
+    let computed = baseRadius * Math.pow(1 / k, alpha);
+    radius = clamp(computed, 3, 14);
+  }
 
   // Visibility and label visibility based on zoom and node type
   let visible = true;
