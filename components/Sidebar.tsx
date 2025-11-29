@@ -1,6 +1,7 @@
 import React from 'react';
 import { GraphNode, NodeType } from '../types';
 import { X, Tag, Calendar, User, Image as ImageIcon } from 'lucide-react';
+import { groupAttributesByDimension } from '../attributeDimensions';
 
 interface SidebarProps {
   node: GraphNode | null;
@@ -57,17 +58,45 @@ const Sidebar: React.FC<SidebarProps> = ({ node, onClose }) => {
         {node.attributes && node.attributes.length > 0 && (
           <div>
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3 flex items-center gap-2">
-              <Tag className="w-3 h-3" /> Associated Tags
+              <Tag className="w-3 h-3" /> Attributes
             </h3>
-            <div className="flex flex-wrap gap-2">
-              {node.attributes.map((attr, i) => (
-                <span 
-                  key={i} 
-                  className="px-3 py-1 rounded-full bg-gray-800 border border-gray-700 text-xs text-blue-300 hover:border-blue-500/50 hover:text-blue-200 transition-colors cursor-default"
-                >
-                  #{attr}
-                </span>
-              ))}
+
+            <div className="space-y-3">
+              {groupAttributesByDimension(node.attributes)
+                .filter((group) => group.dimension.visibleInSidebar && group.attributes.length > 0)
+                .map((group) => {
+                  const canonicalAttrs = group.attributes.filter((a) => a.canonical);
+                  const specificAttrs = group.attributes.filter((a) => !a.canonical);
+                  return (
+                    <div key={group.dimension.id} className="space-y-1">
+                      <p className="text-[11px] uppercase tracking-wide text-gray-500">
+                        {group.dimension.label}
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {/* Canonical attributes first - bolder styling */}
+                        {canonicalAttrs.map((attr) => (
+                          <span
+                            key={attr.id}
+                            className={`px-2 py-1 rounded-full text-[11px] font-semibold ${group.dimension.colorClass}`}
+                            title="Primary attribute"
+                          >
+                            {attr.value}
+                          </span>
+                        ))}
+                        {/* Specific attributes - slightly dimmer */}
+                        {specificAttrs.map((attr) => (
+                          <span
+                            key={attr.id}
+                            className={`px-2 py-1 rounded-full text-[11px] opacity-70 ${group.dimension.colorClass}`}
+                            title="Specific attribute"
+                          >
+                            {attr.value}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
           </div>
         )}

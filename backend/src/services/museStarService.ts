@@ -1,5 +1,9 @@
 import { runReadTransaction } from '../config/neo4j.js';
 import neo4j from 'neo4j-driver';
+import {
+  STYLE_DIMENSION_ID,
+  MOOD_DIMENSION_ID,
+} from '../config/attributeDimensions.js';
 
 export interface MuseStar {
   id: string;
@@ -44,7 +48,7 @@ export async function detectMuseStarsForUser(
 
       // Get attributes for each image, focusing on style and mood
       MATCH (img)-[:HAS_ATTRIBUTE]->(a:Attribute)
-      WHERE a.type IN ['style', 'mood']
+      WHERE a.type IN [$styleType, $moodType]
 
       // Group by attribute type and value
       WITH a.type as attrType, a.value as attrValue,
@@ -59,7 +63,12 @@ export async function detectMuseStarsForUser(
       ORDER BY imageCount ASC
       LIMIT $limit
       `,
-      { userId, limit: neo4j.int(limit) }
+      {
+        userId,
+        limit: neo4j.int(limit),
+        styleType: STYLE_DIMENSION_ID,
+        moodType: MOOD_DIMENSION_ID,
+      }
     );
 
     const museStars: MuseStar[] = result.records.map((record: any, idx: number) => ({
@@ -97,8 +106,8 @@ export async function detectMuseStarsByBuckets(
       MATCH (u:User {id: $userId})-[:UPLOADED]->(i:Image)
 
       // Get style and mood attributes
-      OPTIONAL MATCH (i)-[:HAS_ATTRIBUTE]->(style:Attribute {type: 'style'})
-      OPTIONAL MATCH (i)-[:HAS_ATTRIBUTE]->(mood:Attribute {type: 'mood'})
+      OPTIONAL MATCH (i)-[:HAS_ATTRIBUTE]->(style:Attribute {type: $styleType})
+      OPTIONAL MATCH (i)-[:HAS_ATTRIBUTE]->(mood:Attribute {type: $moodType})
 
       // Group by style + mood combination
       WITH style.value as styleValue, mood.value as moodValue,
@@ -122,7 +131,12 @@ export async function detectMuseStarsByBuckets(
       ORDER BY bucket.count ASC
       LIMIT $limit
       `,
-      { userId, limit: neo4j.int(limit) }
+      {
+        userId,
+        limit: neo4j.int(limit),
+        styleType: STYLE_DIMENSION_ID,
+        moodType: MOOD_DIMENSION_ID,
+      }
     );
 
     const museStars: MuseStar[] = result.records.map((record: any, idx: number) => ({
@@ -131,11 +145,11 @@ export async function detectMuseStarsByBuckets(
       userId,
       targetAttributes: [
         {
-          type: 'style',
+          type: STYLE_DIMENSION_ID,
           value: record.get('styleValue'),
         },
         {
-          type: 'mood',
+          type: MOOD_DIMENSION_ID,
           value: record.get('moodValue'),
         },
       ],
