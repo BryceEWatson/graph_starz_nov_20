@@ -3,6 +3,7 @@ import { Upload, X, CheckCircle, AlertCircle, Loader2, BrainCircuit, Share2 } fr
 import { UploadStatus } from '../types';
 import { initUpload, uploadToGCS, completeUpload } from '../services/uploadService';
 import { useGraph } from '../contexts/GraphContext';
+import { normalizeAttributes, groupAttributesByDimension } from '../attributeDimensions';
 
 const TOKEN_KEY = 'graph_starz_jwt_token';
 
@@ -188,15 +189,63 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuccess })
 
                     {uploadedImageData && (
                       <div className="bg-gray-800/50 rounded-lg p-4 border border-gray-700 mt-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        <h3 className="font-bold text-white mb-1">{uploadedImageData.analysis.title}</h3>
-                        <p className="text-xs text-gray-400 mb-3">{uploadedImageData.analysis.description}</p>
-                        <div className="flex flex-wrap gap-2">
-                          {uploadedImageData.analysis.attributes.map((attr: any, i: number) => (
-                            <span key={i} className="px-2 py-1 rounded-full bg-gray-700 text-xs text-blue-300 border border-gray-600">
-                              #{attr.value}
-                            </span>
-                          ))}
-                        </div>
+                        <h3 className="font-bold text-white mb-1">
+                          {uploadedImageData.analysis.title}
+                        </h3>
+                        <p className="text-xs text-gray-400 mb-4">
+                          {uploadedImageData.analysis.description}
+                        </p>
+
+                        {uploadedImageData.analysis.attributes?.length > 0 && (
+                          <div className="space-y-3">
+                            {groupAttributesByDimension(
+                              normalizeAttributes(
+                                uploadedImageData.analysis.attributes.map((attr: any) => ({
+                                  type: attr.type,
+                                  value: attr.value,
+                                  confidence: attr.confidence,
+                                  source: 'ai' as const,
+                                  canonical: attr.canonical,
+                                }))
+                              )
+                            )
+                              .filter((group) => group.dimension.visibleInUpload && group.attributes.length > 0)
+                              .map((group) => {
+                                const canonicalAttrs = group.attributes.filter((a) => a.canonical);
+                                const specificAttrs = group.attributes.filter((a) => !a.canonical);
+                                return (
+                                  <div key={group.dimension.id} className="space-y-1">
+                                    <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 flex items-center gap-2">
+                                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-primary" />
+                                      {group.dimension.label}
+                                    </p>
+                                    <div className="flex flex-wrap gap-2">
+                                      {/* Canonical attributes first - bolder styling */}
+                                      {canonicalAttrs.map((attr) => (
+                                        <span
+                                          key={attr.id}
+                                          className={`px-2 py-1 rounded-full text-[11px] font-semibold ${group.dimension.colorClass}`}
+                                          title="Primary attribute"
+                                        >
+                                          {attr.value}
+                                        </span>
+                                      ))}
+                                      {/* Specific attributes - slightly dimmer */}
+                                      {specificAttrs.map((attr) => (
+                                        <span
+                                          key={attr.id}
+                                          className={`px-2 py-1 rounded-full text-[11px] opacity-70 ${group.dimension.colorClass}`}
+                                          title="Specific attribute"
+                                        >
+                                          {attr.value}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
