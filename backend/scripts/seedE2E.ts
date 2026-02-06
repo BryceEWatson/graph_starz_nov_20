@@ -1,3 +1,17 @@
+/**
+ * E2E Seed Script
+ * 
+ * Seeds the Neo4j database with test data for end-to-end testing.
+ * Creates a test user, images with attributes, a board, and a constellation.
+ * 
+ * Required environment variables:
+ * - NEO4J_URI: Neo4j connection URI (e.g., bolt://localhost:7687)
+ * - NEO4J_PASSWORD: Neo4j password
+ * 
+ * Optional environment variables:
+ * - NEO4J_USERNAME: Neo4j username (defaults to 'neo4j')
+ */
+
 import dotenv from 'dotenv';
 import neo4j from 'neo4j-driver';
 
@@ -16,7 +30,57 @@ const password = process.env.NEO4J_PASSWORD as string;
 
 const driver = neo4j.driver(uri, neo4j.auth.basic(username, password));
 
-const seedPayload = {
+/**
+ * Interfaces for type safety
+ */
+interface SeedUser {
+  id: string;
+  email: string;
+  name: string;
+  profilePictureUrl: string;
+  createdAt: string;
+}
+
+interface ImageAttribute {
+  type: string;
+  value: string;
+  confidence: number;
+  canonical: boolean;
+}
+
+interface SeedImage {
+  id: string;
+  title: string;
+  description: string;
+  url: string;
+  thumbnailUrl: string;
+  uploadedAt: string;
+  attributes: ImageAttribute[];
+}
+
+interface SeedBoard {
+  id: string;
+  name: string;
+  description: string;
+  createdAt: string;
+}
+
+interface SeedConstellation {
+  id: string;
+  name: string;
+  description: string;
+  createdAt: string;
+}
+
+/**
+ * Test data payload
+ */
+const seedPayload: {
+  user: SeedUser;
+  images: SeedImage[];
+  board: SeedBoard;
+  constellation: SeedConstellation;
+} = {
   user: {
     id: 'e2e_user_001',
     email: 'e2e.user@graphstarz.test',
@@ -66,9 +130,76 @@ const seedPayload = {
   },
 };
 
+/**
+ * Verify connection to Neo4j with retry logic
+ */
+async function verifyConnection(maxRetries = 5, delayMs = 1000): Promise<void> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await driver.verifyConnectivity();
+      console.log('✅ Connected to Neo4j successfully.');
+      return;
+    } catch (error) {
+      if (attempt === maxRetries) {
+        throw new Error(`Failed to connect to Neo4j after ${maxRetries} attempts: ${error}`);
+      }
+      console.log(`⏳ Connection attempt ${attempt}/${maxRetries} failed, retrying in ${delayMs}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+}
+
+/**
+ * Validate that seed data was created successfully
+ */
+async function validateSeedData(): Promise<void> {
+  const session = driver.session();
+  try {
+    const result = await session.run(
+      `
+      MATCH (u:User {id: $userId})
+      OPTIONAL MATCH (u)-[:UPLOADED]->(i:Image)
+      OPTIONAL MATCH (u)-[:CREATED]->(b:Board)
+      OPTIONAL MATCH (u)-[:CREATED]->(c:Constellation)
+      RETURN 
+        count(DISTINCT u) as userCount,
+        count(DISTINCT i) as imageCount,
+        count(DISTINCT b) as boardCount,
+        count(DISTINCT c) as constellationCount
+      `,
+      { userId: seedPayload.user.id }
+    );
+    
+    const record = result.records[0];
+    const userCount = record.get('userCount').toNumber();
+    const imageCount = record.get('imageCount').toNumber();
+    const boardCount = record.get('boardCount').toNumber();
+    const constellationCount = record.get('constellationCount').toNumber();
+    
+    console.log('📊 Validation results:');
+    console.log(`   Users: ${userCount} (expected: 1)`);
+    console.log(`   Images: ${imageCount} (expected: 2)`);
+    console.log(`   Boards: ${boardCount} (expected: 1)`);
+    console.log(`   Constellations: ${constellationCount} (expected: 1)`);
+    
+    if (userCount !== 1 || imageCount !== 2 || boardCount !== 1 || constellationCount !== 1) {
+      throw new Error('Seed validation failed: unexpected entity counts');
+    }
+    
+    console.log('✅ Seed data validation passed.');
+  } finally {
+    await session.close();
+  }
+}
+
+/**
+ * Seed the database with test data
+ */
 async function seed() {
   const session = driver.session();
   try {
+    console.log('🌱 Starting seed operation...');
+    
     await session.executeWrite(async (tx) => {
       await tx.run(
         `
@@ -141,13 +272,26 @@ async function seed() {
     });
 
     console.log('✅ Seeded E2E data successfully.');
+  } catch (error) {
+    console.error('❌ Error during seed operation:', error);
+    throw error;
   } finally {
     await session.close();
-    await driver.close();
   }
 }
 
-seed().catch((error) => {
+/**
+ * Main execution
+ */
+async function main() {
+  console.log('Running E2E seed script...');
+  await verifyConnection();
+  await seed();
+  await validateSeedData();
+  await driver.close();
+}
+
+main().catch((error) => {
   console.error('❌ Failed to seed E2E data:', error);
   process.exit(1);
 });
