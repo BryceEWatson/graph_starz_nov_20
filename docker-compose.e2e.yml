@@ -1,0 +1,34 @@
+version: '3.9'
+
+services:
+  neo4j:
+    image: neo4j:5.22
+    container_name: graph-starz-e2e-neo4j
+    ports:
+      - '7474:7474'
+      - '7687:7687'
+    environment:
+      NEO4J_AUTH: 'neo4j/testpassword'
+      NEO4J_server_memory_pagecache_size: 1G
+      NEO4J_server_memory_heap_initial__size: 1G
+      NEO4J_server_memory_heap_max__size: 1G
+    volumes:
+      - neo4j_e2e_data:/data
+
+  fake-gcs:
+    image: fsouza/fake-gcs-server:latest
+    container_name: graph-starz-e2e-fake-gcs
+    ports:
+      - '4443:4443'
+    command:
+      - '-scheme'
+      - 'http'
+      - '-port'
+      - '4443'
+      - '-public-host'
+      - 'localhost:4443'
+      - '-external-url'
+      - 'http://localhost:4443'
+
+volumes:
+  neo4j_e2e_data:
