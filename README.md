@@ -1,5 +1,7 @@
 # Graph Starz
 
+![TypeScript](https://img.shields.io/badge/TypeScript-94.2%25-blue) ![Neo4j](https://img.shields.io/badge/Neo4j-Graph_DB-008CC1) ![React](https://img.shields.io/badge/React-18-61DAFB) ![D3.js](https://img.shields.io/badge/D3.js-Visualization-F9A03C) ![Google Gemini](https://img.shields.io/badge/Gemini-3_Pro-4285F4) ![Cypher](https://img.shields.io/badge/Cypher-4.6%25-green)
+
 > **Graph Starz is a living map of AI images, where creators are the stars and every contribution expands the universe.**
 
 Graph Starz is a global graph index of AI-generated images, users, and attributes. Every uploaded image becomes a point in this living map, revealing connections between styles, subjects, and moods. An AI Muse reads this map and suggests what to create next through **Muse Stars**—subtle suggested nodes that point to underexplored regions where a new image could expand the universe.
