@@ -13,7 +13,7 @@ The project has extensive documentation with working code examples. Don't reinve
 ## 🎨 Brand & Voice
 
 ### Product Narrative
-
+h
 **Primary Tagline:**
 > Graph Starz is a living map of AI images, where creators are the stars and every contribution expands the universe.
 
@@ -229,9 +229,9 @@ All environment is configured in `backend/.env`:
 
 ```bash
 ✅ Project: starz-439218
-✅ Neo4j: bolt://localhost:7687 (password: YOUR_NEO4J_PASSWORD)
+✅ Neo4j: bolt://localhost:7687 (password: <YOUR_NEO4J_PASSWORD>)
 ✅ GCS Bucket: starz-images
-✅ Gemini API: YOUR_GEMINI_API_KEY
+✅ Gemini API: <YOUR_GEMINI_API_KEY>
 ✅ OAuth: Configured with client ID and secret
 ✅ JWT Secret: Auto-generated
 ```
