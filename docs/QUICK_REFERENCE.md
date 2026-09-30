@@ -75,7 +75,8 @@ graph-starz/
 │   │   │   └── neo4j.ts            # ✅ Neo4j connection
 │   │   ├── middleware/
 │   │   │   ├── errorMiddleware.ts  # ✅ Error handling
-│   │   │   └── authMiddleware.ts   # ✅ JWT auth middleware
+│   │   │   ├── authMiddleware.ts   # ✅ JWT auth + allow-list gate
+│   │   │   └── rateLimitMiddleware.ts # ✅ Per-user limits on Gemini routes
 │   │   ├── routes/
 │   │   │   ├── health.ts           # ✅ Health check
 │   │   │   ├── auth.ts             # ✅ Google OAuth, JWT, waitlist
@@ -90,9 +91,12 @@ graph-starz/
 │   │   │   ├── similarityService.ts# ⏳ Phase 4 (future)
 │   │   │   ├── museStarService.ts  # ✅ Gap detection
 │   │   │   └── aiMuseService.ts    # ✅ Prompt generation
+│   │   ├── shared/
+│   │   │   └── museStarContract.ts # ✅ Muse API types, also imported by the front end
 │   │   ├── utils/
 │   │   │   └── logger.ts           # ✅ Winston logging
-│   │   └── index.ts                # ✅ Express server
+│   │   ├── app.ts                  # ✅ Express app: routes + allow-list gate
+│   │   └── index.ts                # ✅ Server startup
 │   │
 │   ├── scripts/
 │   │   ├── init-neo4j.cypher       # ✅ Database schema
@@ -134,7 +138,8 @@ npm install              # Install dependencies
 npm run dev              # Start dev server (hot reload)
 npm run build            # Compile TypeScript
 npm start                # Run production build
-npm test                 # Run tests
+npm test                 # Run unit and route tests (no database or Google services needed)
+npm run lint             # ESLint (warnings for `any`, errors fail)
 
 # Neo4j
 # Open browser: http://localhost:7474

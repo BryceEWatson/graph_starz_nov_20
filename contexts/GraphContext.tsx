@@ -6,7 +6,7 @@ import {
   fetchGlobalGraph,
   BackendGraphData,
 } from '../services/graphService';
-import { fetchMuseStars, MuseStar } from '../services/museStarService';
+import { fetchMuseStars, MuseStar, museStarToGraphNode } from '../services/museStarService';
 import { normalizeAttributes, isCanonicalAttributeValue } from '../attributeDimensions';
 
 interface GraphContextType {
@@ -111,18 +111,7 @@ function convertBackendGraphToFrontend(
   });
 
   // Add Muse Star nodes
-  const museStarNodes: GraphNode[] = museStars.map((museStar) => ({
-    id: museStar.id,
-    type: NodeType.MUSE_STAR,
-    label: museStar.targetAttributes.map((a) => a.value).join(' + '),
-    radius: 30,
-    targetAttributes: museStar.targetAttributes,
-    attributeGap: museStar.context.attributeGap,
-    imageCount: museStar.context.imageCount,
-    nearbyImages: museStar.context.nearbyImages,
-    x: museStar.position?.x || Math.random() * 1000,
-    y: museStar.position?.y || Math.random() * 1000,
-  }));
+  const museStarNodes: GraphNode[] = museStars.map(museStarToGraphNode);
 
   const links: GraphLink[] = backendData.edges.map((edge) => ({
     source: edge.source,
@@ -153,8 +142,9 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({
   const [viewMode, setViewMode] = useState<'ego' | 'global'>('ego');
 
   const loadGraph = useCallback(async () => {
+    // Both views need a signed-in, allow-listed user
     const token = localStorage.getItem(TOKEN_KEY);
-    if (!token && viewMode === 'ego') {
+    if (!token) {
       setGraphData({ nodes: [], links: [] });
       setMuseStars([]);
       return;
@@ -167,7 +157,7 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({
       let backendData: BackendGraphData;
       let stars: MuseStar[] = [];
 
-      if (viewMode === 'ego' && token) {
+      if (viewMode === 'ego') {
         // Fetch ego graph and Muse Stars in parallel
         const [egoData, museStarData] = await Promise.all([
           fetchEgoGraph(token),
@@ -177,7 +167,7 @@ export const GraphProvider: React.FC<{ children: React.ReactNode }> = ({
         stars = museStarData.museStars;
       } else {
         // Fetch global graph
-        backendData = await fetchGlobalGraph(100, 0);
+        backendData = await fetchGlobalGraph(token, 100, 0);
       }
 
       setMuseStars(stars);

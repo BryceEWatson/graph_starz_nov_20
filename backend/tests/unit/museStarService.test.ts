@@ -12,6 +12,7 @@ vi.mock('../../src/config/neo4j.js', () => ({
   runReadTransaction: vi.fn(),
 }));
 
+import neo4j from 'neo4j-driver';
 import { runReadTransaction } from '../../src/config/neo4j.js';
 import {
   detectMuseStarsForUser,
@@ -95,10 +96,10 @@ describe('MuseStarService', () => {
 
       await detectMuseStarsForUser('user-123', 3);
 
-      // Verify limit was passed to the query
+      // Verify limit was passed to the query as a Neo4j integer (LIMIT rejects floats)
       expect(mockTx.run).toHaveBeenCalledWith(
         expect.any(String),
-        expect.objectContaining({ userId: 'user-123', limit: 3 })
+        expect.objectContaining({ userId: 'user-123', limit: neo4j.int(3) })
       );
     });
   });

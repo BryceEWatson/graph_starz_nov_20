@@ -1,48 +1,15 @@
-import express, { Express } from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import 'express-async-errors';
 import dotenv from 'dotenv';
 
 import { config } from './config/env.js';
 import { initNeo4j, closeNeo4j } from './config/neo4j.js';
-import { healthRouter } from './routes/health.js';
-import { authRouter } from './routes/auth.js';
-import { uploadsRouter } from './routes/uploads.js';
-import { graphRouter } from './routes/graph.js';
-import { museStarsRouter } from './routes/museStars.js';
-import { errorMiddleware } from './middleware/errorMiddleware.js';
+import { createApp } from './app.js';
 import { logger } from './utils/logger.js';
 
 // Load environment variables
 dotenv.config();
 
-// Create Express app
-const app: Express = express();
-
-// Middleware
-app.use(helmet());
-app.use(cors({
-  origin: config.frontendOrigin,
-  credentials: true,
-}));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Routes
-app.use('/health', healthRouter);
-app.use('/auth', authRouter);
-app.use('/uploads', uploadsRouter);
-app.use('/graph', graphRouter);
-app.use('/muse-stars', museStarsRouter);
-
-// TODO: Add more routes as they're implemented
-// app.use('/me', meRouter);
-// app.use('/users', usersRouter);
-// app.use('/images', imagesRouter);
-
-// Error handling middleware (must be last)
-app.use(errorMiddleware);
+// Create Express app (routes and middleware live in app.ts)
+const app = createApp();
 
 // Start server
 async function startServer() {

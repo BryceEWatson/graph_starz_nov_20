@@ -10,6 +10,16 @@ This document outlines the testing strategy for Graph Starz, covering unit tests
 - **Fast feedback loops** - Unit tests should run in milliseconds
 - **Confidence over coverage** - 80% coverage of critical paths > 100% coverage
 
+## What Exists Today
+
+The rest of this guide is the plan. These are the tests that exist now (run with `npm test` in `backend/`):
+
+- **Unit tests** (`backend/tests/unit/`): Muse Star detection, the AI Muse reply parser and the Neo4j driver settings.
+- **Route tests** (`backend/tests/routes/`): drive the real Express app from `createApp()` in `src/app.ts` with supertest. Neo4j, Gemini, Cloud Storage and Google sign-in are replaced at their client libraries (`tests/helpers/fakes.ts`), so all of the app's own code runs. They cover the allow-list gate and waitlist flow, email-free graph responses, `/graph/global` paging, Muse input limits, the per-user Gemini rate limits, and the whole Muse flow using the front end's own request code from `services/museStarService.ts`.
+- **Fake configuration** (`backend/tests/setup/testEnv.ts`) is set for every test, so a real `backend/.env` is never read.
+
+Not yet written: tests against a real Neo4j. The fakes return what the driver returns with `disableLosslessIntegers` on (plain numbers), so only a real-database test can prove that setting works.
+
 ## Test Structure
 
 ```

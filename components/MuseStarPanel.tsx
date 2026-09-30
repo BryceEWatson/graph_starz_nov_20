@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { X, Copy, Check, Loader2, Sparkles } from 'lucide-react';
 import { GraphNode } from '../types';
-import { generatePrompts, MuseStar, MuseStarPrompt } from '../services/museStarService';
+import {
+  buildGeneratePromptsRequest,
+  generatePrompts,
+  PromptSuggestion,
+} from '../services/museStarService';
 
 const TOKEN_KEY = 'graph_starz_jwt_token';
 
@@ -11,7 +15,7 @@ interface MuseStarPanelProps {
 }
 
 const MuseStarPanel: React.FC<MuseStarPanelProps> = ({ museStar, onClose }) => {
-  const [prompts, setPrompts] = useState<MuseStarPrompt[]>([]);
+  const [prompts, setPrompts] = useState<PromptSuggestion[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
@@ -34,20 +38,7 @@ const MuseStarPanel: React.FC<MuseStarPanelProps> = ({ museStar, onClose }) => {
       setError(null);
 
       try {
-        // Convert GraphNode to MuseStar format
-        const museStarData: MuseStar = {
-          id: museStar.id,
-          type: 'muse_star',
-          userId: '', // Not needed for prompt generation
-          targetAttributes: museStar.targetAttributes || [],
-          context: {
-            nearbyImages: museStar.nearbyImages || [],
-            attributeGap: museStar.attributeGap || '',
-            imageCount: museStar.imageCount || 0,
-          },
-        };
-
-        const response = await generatePrompts(museStarData, token);
+        const response = await generatePrompts(buildGeneratePromptsRequest(museStar), token);
         setPrompts(response.prompts);
       } catch (err: any) {
         setError(err.message || 'Failed to generate prompts');
@@ -132,7 +123,7 @@ const MuseStarPanel: React.FC<MuseStarPanelProps> = ({ museStar, onClose }) => {
         {/* Prompts */}
         {!isLoading && !error && prompts.length > 0 && (
           <div className="space-y-4">
-            {prompts.map((prompt, index) => (
+            {prompts.map((prompt: PromptSuggestion, index: number) => (
               <div
                 key={index}
                 className="bg-gray-800/50 border border-gray-700 rounded-lg p-4 hover:border-primary/50 transition-colors"
@@ -150,7 +141,7 @@ const MuseStarPanel: React.FC<MuseStarPanelProps> = ({ museStar, onClose }) => {
                     {prompt.label}
                   </span>
                   <button
-                    onClick={() => handleCopy(prompt.text, index)}
+                    onClick={() => handleCopy(prompt.promptText, index)}
                     className="p-2 rounded hover:bg-gray-700 transition-colors text-gray-400 hover:text-white"
                     title="Copy to clipboard"
                   >
@@ -161,7 +152,7 @@ const MuseStarPanel: React.FC<MuseStarPanelProps> = ({ museStar, onClose }) => {
                     )}
                   </button>
                 </div>
-                <p className="text-sm text-gray-200 leading-relaxed">{prompt.text}</p>
+                <p className="text-sm text-gray-200 leading-relaxed">{prompt.promptText}</p>
               </div>
             ))}
           </div>

@@ -4,22 +4,9 @@ import {
   STYLE_DIMENSION_ID,
   MOOD_DIMENSION_ID,
 } from '../config/attributeDimensions.js';
+import { MuseStar } from '../shared/museStarContract.js';
 
-export interface MuseStar {
-  id: string;
-  type: 'muse_star';
-  userId: string;
-  targetAttributes: Array<{
-    type: string;
-    value: string;
-  }>;
-  context: {
-    nearbyImages: string[]; // IDs of nearby images
-    attributeGap: string; // Description of what's underexplored
-    imageCount: number;
-  };
-  position?: { x: number; y: number }; // Optional suggested position
-}
+export type { MuseStar };
 
 /**
  * Detect underexplored regions in a user's ego network

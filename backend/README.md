@@ -21,7 +21,7 @@ pnpm dev
 - `pnpm dev` - Start development server with hot reload
 - `pnpm build` - Compile TypeScript to JavaScript
 - `pnpm start` - Run production server (requires build)
-- `pnpm test` - Run test suite
+- `pnpm test` - Run test suite (unit tests, plus route tests that drive the real Express app with Neo4j, Gemini, Cloud Storage and Google sign-in replaced at their client libraries; see `tests/helpers/fakes.ts`)
 - `pnpm test:watch` - Run tests in watch mode
 - `pnpm test:coverage` - Generate test coverage report
 - `pnpm lint` - Check code style
@@ -69,17 +69,27 @@ backend/
 
 ## API Endpoints
 
-### Implemented
+### Open (no allow-list check)
 - `GET /health` - Service health status
 - `GET /health/live` - Kubernetes liveness probe
 - `GET /health/ready` - Kubernetes readiness probe
+- `POST /auth/google` - Google OAuth sign-in (issues a session to anyone, with a `whitelisted` flag)
+- `GET /auth/validate` - Session check (any signed-in user)
+- `POST /auth/logout` - Logout
+- `POST /auth/waitlist` - Join the waitlist (any signed-in user)
+
+### Allow-listed users only (`WHITELISTED_EMAILS`)
+Enforced once in `src/app.ts`: no session is 401, a session for someone not on the list is 403, and routes added below the check are covered automatically.
+- `POST /uploads/init` - Initialize image upload
+- `POST /uploads/complete` - Complete upload and trigger AI (30 per user per hour)
+- `GET /graph/ego` - User's ego network
+- `GET /graph/global` - Global graph sample (`limit` 1-100, larger values are capped at 100; `skip` 0-10,000)
+- `GET /muse-stars/ego` - Muse Stars for the user's map
+- `POST /muse-stars/prompts` - AI Muse prompt suggestions (30 per user per hour; field sizes limited by `MUSE_PROMPT_LIMITS` in `src/shared/museStarContract.ts`)
+
+Graph responses never include email addresses.
 
 ### Planned (TODO)
-- `POST /auth/google` - Google OAuth authentication
-- `POST /uploads/init` - Initialize image upload
-- `POST /uploads/complete` - Complete upload and trigger AI
-- `GET /graph/ego` - User's ego network
-- `GET /graph/global` - Global graph sample
 - `GET /me` - Current user profile
 - `GET /me/uploads` - User's images
 
