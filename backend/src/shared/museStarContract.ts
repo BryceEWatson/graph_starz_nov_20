@@ -17,6 +17,7 @@ export const MUSE_PROMPT_LIMITS = {
 } as const;
 
 export interface MuseStarAttribute {
+  /** A core dimension: style, mood, subject, color, lighting or composition. The prompts route rejects anything else. */
   type: string;
   value: string;
 }

@@ -1,7 +1,8 @@
 /**
  * Stand-ins for the app's outside services, swapped in at their client libraries
  * with vi.mock so every line of the app's own code still runs:
- *   neo4j-driver          -> fakeNeo4j (tests register the rows each query returns)
+ *   neo4j-driver          -> fakeNeo4j (tests register the rows each query returns;
+ *                            whole numbers come back the way the real driver returns them)
  *   @google/generative-ai -> fakeGemini
  *   @google-cloud/storage -> an in-memory bucket
  *   google-auth-library   -> fakeGoogleSignIn
@@ -113,16 +114,35 @@ function answerUserQuery(query: string, params: Row): Row[] | undefined {
   return undefined;
 }
 
+// Like the real driver, return whole numbers as the driver's Integer objects
+// unless the app created the driver with disableLosslessIntegers.
+let returnsIntegerObjects = true;
+let toDriverInteger: (value: number) => unknown = (value) => value;
+
+function asDriverValue(value: unknown): unknown {
+  if (typeof value === 'number' && Number.isInteger(value) && returnsIntegerObjects) {
+    return toDriverInteger(value);
+  }
+  if (Array.isArray(value)) {
+    return value.map(asDriverValue);
+  }
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, asDriverValue(item)]));
+  }
+  return value;
+}
+
 function toRecord(row: Row) {
+  const values = asDriverValue(row) as Row;
   return {
-    keys: Object.keys(row),
+    keys: Object.keys(values),
     get(key: string) {
-      if (!(key in row)) {
+      if (!(key in values)) {
         throw new Error(`fakeNeo4j: record has no field "${key}"`);
       }
-      return row[key];
+      return values[key];
     },
-    toObject: () => row,
+    toObject: () => values,
   };
 }
 
@@ -153,7 +173,13 @@ export const fakeDriver = {
 };
 
 export function mockNeo4jDriver(actual: any) {
-  const driver = vi.fn(() => fakeDriver);
+  toDriverInteger = (value) => actual.default.int(value);
+  const driver = vi.fn(
+    (_uri: string, _auth: unknown, config?: { disableLosslessIntegers?: boolean }) => {
+      returnsIntegerObjects = !config?.disableLosslessIntegers;
+      return fakeDriver;
+    }
+  );
   return { ...actual, driver, default: { ...actual.default, driver } };
 }
 

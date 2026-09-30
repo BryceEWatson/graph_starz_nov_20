@@ -18,8 +18,8 @@ import {
   detectMuseStarsForUser,
   detectMuseStarsByBuckets,
   getMuseStarsForUser,
-  MuseStar,
 } from '../../src/services/museStarService.js';
+import { MuseStar, MUSE_PROMPT_LIMITS } from '../../src/shared/museStarContract.js';
 
 describe('MuseStarService', () => {
   beforeEach(() => {
@@ -133,6 +133,54 @@ describe('MuseStarService', () => {
       expect(result[0].targetAttributes).toContainEqual({ type: 'mood', value: 'energetic' });
       expect(result[0].context.attributeGap).toContain('cyberpunk style');
       expect(result[0].context.attributeGap).toContain('energetic mood');
+    });
+  });
+
+  describe('Muse Stars the prompts route would reject', () => {
+    function recordsFrom(rows: Array<Record<string, unknown>>) {
+      return rows.map((row) => ({ get: (key: string) => row[key] }));
+    }
+
+    it('skips one whose attribute value is longer than the prompt limit', async () => {
+      const mockTx = {
+        run: vi.fn().mockResolvedValue({
+          records: recordsFrom([
+            { styleValue: 'watercolor', moodValue: 'serene', imageCount: 1, imageIds: ['img-1'] },
+            {
+              styleValue: 'x'.repeat(MUSE_PROMPT_LIMITS.attributeValueLength + 1),
+              moodValue: 'serene',
+              imageCount: 1,
+              imageIds: ['img-2'],
+            },
+          ]),
+        }),
+      };
+      vi.mocked(runReadTransaction).mockImplementation(async (fn: any) => fn(mockTx));
+
+      const result = await detectMuseStarsByBuckets('user-123');
+
+      expect(result).toHaveLength(1);
+      expect(result[0].targetAttributes[0].value).toBe('watercolor');
+    });
+
+    it('keeps one whose attribute value is exactly at the limit', async () => {
+      const mockTx = {
+        run: vi.fn().mockResolvedValue({
+          records: recordsFrom([
+            {
+              attrType: 'style',
+              attrValue: 'x'.repeat(MUSE_PROMPT_LIMITS.attributeValueLength),
+              imageCount: 1,
+              imageIds: ['img-1'],
+            },
+          ]),
+        }),
+      };
+      vi.mocked(runReadTransaction).mockImplementation(async (fn: any) => fn(mockTx));
+
+      const result = await detectMuseStarsForUser('user-123');
+
+      expect(result).toHaveLength(1);
     });
   });
 

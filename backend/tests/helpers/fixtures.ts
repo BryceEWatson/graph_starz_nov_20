@@ -1,7 +1,8 @@
 /**
  * Database rows and Gemini replies shared by the route tests.
- * Counts are plain numbers because the app's driver setting (disableLosslessIntegers
- * in src/config/neo4j.ts) makes the real driver return them that way.
+ * Counts are written as plain numbers. The fake driver hands them to the app as
+ * Integer objects unless src/config/neo4j.ts sets disableLosslessIntegers, just
+ * as the real driver does, so the Muse flow test fails if that setting goes.
  */
 import { fakeNeo4j, fakeGemini, node, APPROVED_USER } from './fakes.js';
 import { GeneratePromptsRequest } from '../../src/shared/museStarContract.js';

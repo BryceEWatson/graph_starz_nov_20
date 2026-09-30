@@ -6,10 +6,10 @@ import { getUserEgoNetwork, getGlobalGraphSample } from '../services/graphServic
 export const graphRouter = Router();
 
 /** Page size for /graph/global when none is given, and the most it will return. */
-export const GLOBAL_GRAPH_DEFAULT_LIMIT = 100;
-export const GLOBAL_GRAPH_MAX_LIMIT = 100;
+const GLOBAL_GRAPH_DEFAULT_LIMIT = 100;
+const GLOBAL_GRAPH_MAX_LIMIT = 100;
 /** Deepest page offset /graph/global accepts. */
-export const GLOBAL_GRAPH_MAX_SKIP = 10_000;
+const GLOBAL_GRAPH_MAX_SKIP = 10_000;
 
 const globalGraphQuerySchema = z.object({
   // Larger page sizes are capped rather than rejected
