@@ -21,6 +21,10 @@ export async function initNeo4j(): Promise<Driver> {
       {
         maxConnectionPoolSize: 50,
         connectionTimeout: 30000, // 30 seconds
+        // Return integers (counts, sizes) as plain JavaScript numbers instead of
+        // the driver's Integer objects, which serialize to JSON as {low, high}.
+        // Query parameters that must be integers (SKIP, LIMIT) still need neo4j.int().
+        disableLosslessIntegers: true,
         logging: {
           level: config.nodeEnv === 'development' ? 'debug' : 'info',
           logger: (level, message) => {

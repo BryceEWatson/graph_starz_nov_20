@@ -41,11 +41,17 @@ export async function fetchEgoGraph(token: string): Promise<BackendGraphData> {
  * Fetch global graph sample
  */
 export async function fetchGlobalGraph(
+  token: string,
   limit: number = 100,
   skip: number = 0
 ): Promise<BackendGraphData> {
   const response = await fetch(
-    `${API_BASE_URL}/graph/global?limit=${limit}&skip=${skip}`
+    `${API_BASE_URL}/graph/global?limit=${limit}&skip=${skip}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
   );
 
   if (!response.ok) {

@@ -176,7 +176,7 @@ export async function getUserById(userId: string): Promise<User | null> {
 
 ```typescript
 import { Request, Response, NextFunction } from 'express';
-import { verifyJWT, getUserById } from '../services/authService.js';
+import { verifyJWT, getUserById, isWhitelisted, User } from '../services/authService.js';
 import { ApiError } from './errorMiddleware.js';
 
 // Extend Express Request to include user
@@ -192,70 +192,72 @@ declare global {
 }
 
 /**
- * Middleware to require authentication
+ * Verify the bearer token and load the signed-in user.
+ * Throws ApiError(401) when there's no valid session.
+ */
+async function authenticate(req: Request): Promise<User> {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader?.startsWith('Bearer ')) {
+    throw new ApiError(401, 'Missing or invalid authorization header');
+  }
+
+  const token = authHeader.substring(7);
+  const payload = verifyJWT(token);
+
+  // Verify user still exists
+  const user = await getUserById(payload.userId);
+  if (!user) {
+    throw new ApiError(401, 'User not found');
+  }
+
+  return user;
+}
+
+function toAuthError(error: unknown): ApiError {
+  return error instanceof ApiError ? error : new ApiError(401, 'Invalid or expired token');
+}
+
+/**
+ * Middleware to require authentication.
+ * Any signed-in user passes, including people who aren't on the allow-list yet,
+ * so it's only for the session check and the waitlist.
  */
 export async function requireAuth(
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ): Promise<void> {
   try {
-    const authHeader = req.headers.authorization;
-
-    if (!authHeader?.startsWith('Bearer ')) {
-      throw new ApiError(401, 'Missing or invalid authorization header');
-    }
-
-    const token = authHeader.substring(7);
-    const payload = verifyJWT(token);
-
-    // Verify user still exists
-    const user = await getUserById(payload.userId);
-    if (!user) {
-      throw new ApiError(401, 'User not found');
-    }
-
-    // Attach user to request
-    req.user = {
-      id: payload.userId,
-      email: payload.email,
-    };
-
+    const user = await authenticate(req);
+    req.user = { id: user.id, email: user.email };
     next();
   } catch (error) {
-    if (error instanceof ApiError) {
-      next(error);
-    } else {
-      next(new ApiError(401, 'Invalid or expired token'));
-    }
+    next(toAuthError(error));
   }
 }
 
 /**
- * Optional auth middleware (doesn't fail if no token)
+ * Middleware to require a signed-in user on the allow-list (WHITELISTED_EMAILS).
+ * app.ts mounts it once in front of every route except health, sign-in and the
+ * waitlist, so new routes are protected by default.
  */
-export async function optionalAuth(
+export async function requireAllowListedUser(
   req: Request,
-  res: Response,
+  _res: Response,
   next: NextFunction
 ): Promise<void> {
   try {
-    const authHeader = req.headers.authorization;
+    const user = await authenticate(req);
 
-    if (authHeader?.startsWith('Bearer ')) {
-      const token = authHeader.substring(7);
-      const payload = verifyJWT(token);
-
-      req.user = {
-        id: payload.userId,
-        email: payload.email,
-      };
+    if (!isWhitelisted(user.email)) {
+      throw new ApiError(403, 'This account is not on the allow-list yet');
     }
 
+    req.user = { id: user.id, email: user.email };
     next();
   } catch (error) {
-    // Silently continue without user
-    next();
+    next(toAuthError(error));
   }
 }
 ```
@@ -327,17 +329,25 @@ authRouter.post('/logout', (req: Request, res: Response) => {
 });
 ```
 
-#### 1.4 Register Auth Routes
+#### 1.4 Register Routes Behind the Allow-List Gate
 
-**File: `backend/src/index.ts`** (update)
+**File: `backend/src/app.ts`** (`createApp()` builds the app; `index.ts` only starts the server)
 
 ```typescript
-// Add to imports
-import { authRouter } from './routes/auth.js';
-
-// Add after health route
+// Open routes: health checks, plus sign-in, the session check and the waitlist,
+// which people who aren't on the allow-list yet still need.
+app.use('/health', healthRouter);
 app.use('/auth', authRouter);
+
+// Everything below this line requires a signed-in user on the allow-list.
+app.use(requireAllowListedUser);
+
+app.use('/uploads', uploadsRouter);
+app.use('/graph', graphRouter);
+app.use('/muse-stars', museStarsRouter);
 ```
+
+Mount every new router below the gate. Anything mounted above it is open to anyone.
 
 ### Testing Auth
 
@@ -528,6 +538,7 @@ async function fetchImageAsBase64(url: string): Promise<string> {
 **File: `backend/src/services/graphService.ts`**
 
 ```typescript
+import neo4j from 'neo4j-driver';
 import { runWriteTransaction, runReadTransaction } from '../config/neo4j.js';
 import { ImageAnalysis } from './aiService.js';
 
@@ -616,15 +627,13 @@ export async function createImageWithAttributes(
 ```typescript
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import { requireAuth } from '../middleware/authMiddleware.js';
+import { uploadAnalysisRateLimit } from '../middleware/rateLimitMiddleware.js';
 import { generateSignedUploadUrl, getPublicUrl, generateThumbnail } from '../services/storageService.js';
 import { analyzeImage } from '../services/aiService.js';
 import { createImageWithAttributes } from '../services/graphService.js';
 
+// Mounted behind requireAllowListedUser (app.ts), so req.user is always set.
 export const uploadsRouter = Router();
-
-// All upload routes require authentication
-uploadsRouter.use(requireAuth);
 
 const initUploadSchema = z.object({
   filename: z.string().min(1),
@@ -659,7 +668,8 @@ uploadsRouter.post('/init', async (req: Request, res: Response) => {
  * POST /uploads/complete
  * Trigger AI analysis and create graph nodes
  */
-uploadsRouter.post('/complete', async (req: Request, res: Response) => {
+// Calls Gemini, so it's rate limited per user
+uploadsRouter.post('/complete', uploadAnalysisRateLimit, async (req: Request, res: Response) => {
   const { imageId, gcsPath } = completeUploadSchema.parse(req.body);
   const userId = req.user!.id;
 
@@ -747,12 +757,16 @@ export async function getUserEgoNetwork(userId: string): Promise<GraphData> {
     const nodes: GraphNode[] = [];
     const edges: GraphEdge[] = [];
 
-    // Add user node
+    // Add user node: only what the map draws, never the email address
     const user = record.get('u');
     nodes.push({
       id: user.properties.id,
       type: 'user',
-      properties: user.properties,
+      properties: {
+        id: user.properties.id,
+        name: user.properties.name,
+        profilePictureUrl: user.properties.profilePictureUrl,
+      },
     });
 
     // Add image nodes
@@ -830,7 +844,8 @@ export async function getGlobalGraphSample(
       MATCH (u:User)-[:UPLOADED]->(i)
       RETURN i, u, attrs
       `,
-      { limit, skip }
+      // SKIP and LIMIT reject floats, and plain JS numbers are sent as floats
+      { limit: neo4j.int(limit), skip: neo4j.int(skip) }
     );
 
     // Transform to graph format
@@ -850,16 +865,34 @@ export async function getGlobalGraphSample(
 
 ```typescript
 import { Router, Request, Response } from 'express';
-import { requireAuth, optionalAuth } from '../middleware/authMiddleware.js';
+import { z } from 'zod';
 import { getUserEgoNetwork, getGlobalGraphSample } from '../services/graphService.js';
 
+// Mounted behind requireAllowListedUser (app.ts), so req.user is always set.
 export const graphRouter = Router();
+
+/** Page size for /graph/global when none is given, and the most it will return. */
+export const GLOBAL_GRAPH_DEFAULT_LIMIT = 100;
+export const GLOBAL_GRAPH_MAX_LIMIT = 100;
+/** Deepest page offset /graph/global accepts. */
+export const GLOBAL_GRAPH_MAX_SKIP = 10_000;
+
+const globalGraphQuerySchema = z.object({
+  // Larger page sizes are capped rather than rejected
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .default(GLOBAL_GRAPH_DEFAULT_LIMIT)
+    .transform((limit) => Math.min(limit, GLOBAL_GRAPH_MAX_LIMIT)),
+  skip: z.coerce.number().int().min(0).max(GLOBAL_GRAPH_MAX_SKIP).default(0),
+});
 
 /**
  * GET /graph/ego
  * Get authenticated user's ego network
  */
-graphRouter.get('/ego', requireAuth, async (req: Request, res: Response) => {
+graphRouter.get('/ego', async (req: Request, res: Response) => {
   const userId = req.user!.id;
   const graph = await getUserEgoNetwork(userId);
 
@@ -868,11 +901,10 @@ graphRouter.get('/ego', requireAuth, async (req: Request, res: Response) => {
 
 /**
  * GET /graph/global
- * Get sampled global graph (optionally authenticated)
+ * Get sampled global graph
  */
-graphRouter.get('/global', optionalAuth, async (req: Request, res: Response) => {
-  const limit = parseInt(req.query.limit as string) || 100;
-  const skip = parseInt(req.query.skip as string) || 0;
+graphRouter.get('/global', async (req: Request, res: Response) => {
+  const { limit, skip } = globalGraphQuerySchema.parse(req.query);
 
   const graph = await getGlobalGraphSample(limit, skip);
 
@@ -891,6 +923,7 @@ graphRouter.get('/global', optionalAuth, async (req: Request, res: Response) => 
 **File: `backend/src/services/similarityService.ts`**
 
 ```typescript
+import neo4j from 'neo4j-driver';
 import { runWriteTransaction, runReadTransaction } from '../config/neo4j.js';
 
 const SIMILARITY_THRESHOLD = 0.7;
@@ -945,7 +978,7 @@ export async function findSimilarImages(
       ORDER BY similarity DESC
       LIMIT $limit
       `,
-      { imageId, limit }
+      { imageId, limit: neo4j.int(limit) }
     );
 
     return result.records.map(r => ({
@@ -1015,6 +1048,7 @@ Implement the **Muse Stars** feature—subtle suggested nodes in the graph that 
 **File: `backend/src/services/museStarService.ts`**
 
 ```typescript
+import neo4j from 'neo4j-driver';
 import { runReadTransaction } from '../config/neo4j.js';
 
 export interface MuseStar {
@@ -1062,7 +1096,7 @@ export async function detectMuseStars(
 
       RETURN attrType, attrValue, imageCount, nearbyImageIds
       `,
-      { boardId, limit }
+      { boardId, limit: neo4j.int(limit) }
     );
 
     const museStars: MuseStar[] = result.records.map((record, idx) => ({
@@ -1108,12 +1142,15 @@ import { MuseStar } from './museStarService.js';
 const genAI = new GoogleGenerativeAI(config.gemini.apiKey);
 const model = genAI.getGenerativeModel({ model: 'gemini-3-pro-preview' });
 
+// The real service imports this from src/shared/museStarContract.ts, which the
+// front end imports too, so both sides read the same field names.
 export interface PromptSuggestion {
   id: string;
   museStarId: string;
+  label: string;
   promptText: string;
   rationale: string;
-  generatedAt: Date;
+  generatedAt: string; // ISO 8601
 }
 
 /**
@@ -1167,7 +1204,7 @@ Return JSON array of 2-3 prompts.`;
     museStarId: museStar.id,
     promptText: p.promptText,
     rationale: p.rationale,
-    generatedAt: new Date(),
+    generatedAt: new Date().toISOString(),
   }));
 }
 
@@ -1201,43 +1238,57 @@ async function getNearbyImageContext(imageIds: string[]): Promise<string> {
 
 ```typescript
 import { Router, Request, Response } from 'express';
-import { requireAuth } from '../middleware/authMiddleware.js';
-import { getMuseStarsForBoard } from '../services/museStarService.js';
-import { generatePromptsForMuseStar } from '../services/aiMuseService.js';
 import { z } from 'zod';
+import { getMuseStarsForUser } from '../services/museStarService.js';
+import { generatePromptsForMuseStar } from '../services/aiMuseService.js';
+import { musePromptsRateLimit } from '../middleware/rateLimitMiddleware.js';
+import { CORE_ATTRIBUTE_DIMENSIONS } from '../config/attributeDimensions.js';
+import {
+  GeneratePromptsRequest,
+  GeneratePromptsResponse,
+  MuseStarsResponse,
+  MUSE_PROMPT_LIMITS,
+} from '../shared/museStarContract.js';
 
+// Mounted behind requireAllowListedUser (app.ts), so req.user is always set.
 export const museStarsRouter = Router();
 
-// All routes require authentication
-museStarsRouter.use(requireAuth);
-
 /**
- * GET /boards/:boardId/muse-stars
- * Get Muse Stars (suggested nodes) for a board
+ * GET /muse-stars/ego
+ * Get Muse Stars (suggested nodes) for user's ego network
  */
-museStarsRouter.get('/boards/:boardId/muse-stars', async (req: Request, res: Response) => {
-  const { boardId } = req.params;
+museStarsRouter.get('/ego', async (req: Request, res: Response) => {
+  const userId = req.user!.id;
 
-  const museStars = await getMuseStarsForBoard(boardId);
+  const museStars = await getMuseStarsForUser(userId);
 
-  res.json({
+  const body: MuseStarsResponse = {
     museStars,
     message: museStars.length > 0
       ? 'Muse Stars found—ideas for extending your map'
-      : 'Your map is well-explored for now',
-  });
+      : 'Your map is well-explored for now. Upload more images to discover new possibilities!',
+  };
+  res.json(body);
 });
 
-const generatePromptsSchema = z.object({
-  targetAttributes: z.array(
-    z.object({
-      type: z.string(),
-      value: z.string(),
-    })
-  ),
+// Everything in this body is written into the Gemini prompt, so each field is bounded
+const generatePromptsSchema: z.ZodType<GeneratePromptsRequest> = z.object({
+  museStarId: z.string().max(MUSE_PROMPT_LIMITS.museStarIdLength).optional(),
+  targetAttributes: z
+    .array(
+      z.object({
+        type: z.enum(CORE_ATTRIBUTE_DIMENSIONS),
+        value: z.string().min(1).max(MUSE_PROMPT_LIMITS.attributeValueLength),
+      })
+    )
+    .min(1)
+    .max(MUSE_PROMPT_LIMITS.targetAttributes),
   context: z.object({
-    nearbyImages: z.array(z.string()),
-    attributeGap: z.string(),
+    nearbyImages: z
+      .array(z.string().min(1).max(MUSE_PROMPT_LIMITS.imageIdLength))
+      .max(MUSE_PROMPT_LIMITS.nearbyImages),
+    attributeGap: z.string().max(MUSE_PROMPT_LIMITS.attributeGapLength),
+    imageCount: z.number().int().nonnegative().optional(),
   }),
 });
 
@@ -1245,23 +1296,29 @@ const generatePromptsSchema = z.object({
  * POST /muse-stars/prompts
  * Generate graph-aware prompts for a Muse Star
  */
-museStarsRouter.post('/muse-stars/prompts', async (req: Request, res: Response) => {
+museStarsRouter.post('/prompts', musePromptsRateLimit, async (req: Request, res: Response) => {
   const museStarData = generatePromptsSchema.parse(req.body);
+  const userId = req.user!.id;
 
   const museStar = {
-    id: `temp-${Date.now()}`,
+    id: museStarData.museStarId || `temp-${Date.now()}`,
     type: 'muse_star' as const,
-    boardId: req.body.boardId || 'default',
+    userId,
     targetAttributes: museStarData.targetAttributes,
-    context: museStarData.context,
+    context: {
+      nearbyImages: museStarData.context.nearbyImages,
+      attributeGap: museStarData.context.attributeGap,
+      imageCount: museStarData.context.imageCount || 0,
+    },
   };
 
   const prompts = await generatePromptsForMuseStar(museStar);
 
-  res.json({
+  const body: GeneratePromptsResponse = {
     prompts,
     message: 'AI Muse suggestions for this part of your map',
-  });
+  };
+  res.json(body);
 });
 ```
 
@@ -1295,14 +1352,14 @@ export async function getGraphWithMuseStars(
 
 #### 5.5 Register Muse Star Routes
 
-**File: `backend/src/index.ts`** (update)
+**File: `backend/src/app.ts`** (update)
 
 ```typescript
 // Add to imports
 import { museStarsRouter } from './routes/museStars.js';
 
-// Add after other routes
-app.use('/api', museStarsRouter);
+// Add below app.use(requireAllowListedUser)
+app.use('/muse-stars', museStarsRouter);
 ```
 
 ### Frontend Integration Notes
@@ -1452,8 +1509,8 @@ Fetches graph data from backend:
 // Fetch user's ego network
 const graph = await fetchEgoGraph(token);
 
-// Fetch global graph sample
-const globalGraph = await fetchGlobalGraph(limit, skip);
+// Fetch global graph sample (needs a signed-in, allow-listed user)
+const globalGraph = await fetchGlobalGraph(token, limit, skip);
 ```
 
 #### Muse Star Service (`services/museStarService.ts`)
@@ -1463,8 +1520,9 @@ Handles Muse Star fetching and prompt generation:
 // Fetch Muse Stars for user
 const { museStars } = await fetchMuseStars(token);
 
-// Generate prompts for a Muse Star
-const { prompts } = await generatePrompts(museStar, token);
+// Build the request from a Muse Star node and generate prompts
+const { prompts } = await generatePrompts(buildGeneratePromptsRequest(museStarNode), token);
+// Each prompt's text is prompts[i].promptText (types from backend/src/shared/museStarContract.ts)
 ```
 
 ### Context Management
@@ -1551,7 +1609,7 @@ const handleNodeSelect = useCallback((node: GraphNode | null) => {
 
 After implementing these phases:
 
-1. **Add Rate Limiting** - Protect endpoints from abuse
+1. **Extend Rate Limiting** - The Gemini routes are limited per user (`rateLimitMiddleware.ts`); the others aren't yet
 2. **Add Caching** - Cache graph queries with Redis
 3. **Add WebSockets** - Real-time graph updates
 4. **Add Metrics** - Prometheus/Grafana monitoring

@@ -48,7 +48,7 @@ export function errorMiddleware(
   });
 
   let statusCode = 500;
-  let errorResponse: ErrorResponse = {
+  const errorResponse: ErrorResponse = {
     error: {
       message: 'Internal server error',
     },

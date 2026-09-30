@@ -1,15 +1,6 @@
 import { runReadTransaction } from '../config/neo4j.js';
-import { MuseStar } from './museStarService.js';
 import { getTextModel } from './geminiClient.js';
-
-export interface PromptSuggestion {
-  id: string;
-  museStarId: string;
-  label: string; // e.g., "Safe", "Bold", "Experimental"
-  promptText: string;
-  rationale: string;
-  generatedAt: Date;
-}
+import { MuseStar, PromptSuggestion } from '../shared/museStarContract.js';
 
 /**
  * Generate graph-aware prompts for a Muse Star
@@ -68,9 +59,18 @@ Return ONLY the JSON array, no other text.`;
 
   const model = getTextModel();
   const result = await model.generateContent(systemPrompt);
-  const response = result.response.text();
 
-  // Parse JSON from response
+  return parsePromptSuggestions(result.response.text(), museStar.id);
+}
+
+/**
+ * Parse the AI Muse's reply (a JSON array, optionally in a ```json fence)
+ * into the suggestions the Muse panel shows.
+ */
+export function parsePromptSuggestions(
+  response: string,
+  museStarId: string
+): PromptSuggestion[] {
   const jsonMatch = response.match(/```json\n?([\s\S]*?)\n?```/) ||
                     response.match(/\[[\s\S]*\]/);
 
@@ -79,14 +79,15 @@ Return ONLY the JSON array, no other text.`;
   }
 
   const prompts = JSON.parse(jsonMatch[1] || jsonMatch[0]);
+  const generatedAt = new Date().toISOString();
 
   return prompts.map((p: any, idx: number) => ({
-    id: `${museStar.id}-prompt-${idx}`,
-    museStarId: museStar.id,
+    id: `${museStarId}-prompt-${idx}`,
+    museStarId,
     label: p.label || `Prompt ${idx + 1}`,
     promptText: p.promptText,
     rationale: p.rationale,
-    generatedAt: new Date(),
+    generatedAt,
   }));
 }
 

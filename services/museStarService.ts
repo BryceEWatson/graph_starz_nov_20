@@ -1,38 +1,56 @@
+import { GraphNode, NodeType } from '../types';
+import type {
+  GeneratePromptsRequest,
+  GeneratePromptsResponse,
+  MuseStar,
+  MuseStarsResponse,
+} from '../backend/src/shared/museStarContract';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
 
-export interface MuseStarAttribute {
-  type: string;
-  value: string;
+// Request and response types come from the backend's contract file, so the
+// panel and the routes use the same field names
+export type {
+  GeneratePromptsRequest,
+  GeneratePromptsResponse,
+  MuseStar,
+  MuseStarAttribute,
+  MuseStarContext,
+  MuseStarsResponse,
+  PromptSuggestion,
+} from '../backend/src/shared/museStarContract';
+
+/**
+ * Turn a Muse Star from the backend into a node on the map
+ */
+export function museStarToGraphNode(museStar: MuseStar): GraphNode {
+  return {
+    id: museStar.id,
+    type: NodeType.MUSE_STAR,
+    label: museStar.targetAttributes.map((a) => a.value).join(' + '),
+    radius: 30,
+    targetAttributes: museStar.targetAttributes,
+    attributeGap: museStar.context.attributeGap,
+    imageCount: museStar.context.imageCount,
+    nearbyImages: museStar.context.nearbyImages,
+    x: museStar.position?.x || Math.random() * 1000,
+    y: museStar.position?.y || Math.random() * 1000,
+  };
 }
 
-export interface MuseStarContext {
-  nearbyImages: string[];
-  attributeGap: string;
-  imageCount: number;
-}
-
-export interface MuseStar {
-  id: string;
-  type: 'muse_star';
-  userId: string;
-  targetAttributes: MuseStarAttribute[];
-  context: MuseStarContext;
-  position?: { x: number; y: number };
-}
-
-export interface MuseStarPrompt {
-  label: string;
-  text: string;
-}
-
-export interface FetchMuseStarsResponse {
-  museStars: MuseStar[];
-  message: string;
-}
-
-export interface GeneratePromptsResponse {
-  prompts: MuseStarPrompt[];
-  message: string;
+/**
+ * Build the prompt request the Muse panel sends for a Muse Star node
+ */
+export function buildGeneratePromptsRequest(museStar: GraphNode): GeneratePromptsRequest {
+  return {
+    museStarId: museStar.id,
+    targetAttributes: museStar.targetAttributes || [],
+    context: {
+      nearbyImages: museStar.nearbyImages || [],
+      attributeGap: museStar.attributeGap || '',
+      imageCount: museStar.imageCount || 0,
+    },
+  };
 }
 
 /**
@@ -40,7 +58,7 @@ export interface GeneratePromptsResponse {
  */
 export async function fetchMuseStars(
   token: string
-): Promise<FetchMuseStarsResponse> {
+): Promise<MuseStarsResponse> {
   const response = await fetch(`${API_BASE_URL}/muse-stars/ego`, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -59,7 +77,7 @@ export async function fetchMuseStars(
  * Generate prompts for a specific Muse Star
  */
 export async function generatePrompts(
-  museStar: MuseStar,
+  request: GeneratePromptsRequest,
   token: string
 ): Promise<GeneratePromptsResponse> {
   const response = await fetch(`${API_BASE_URL}/muse-stars/prompts`, {
@@ -68,11 +86,7 @@ export async function generatePrompts(
       'Content-Type': 'application/json',
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({
-      museStarId: museStar.id,
-      targetAttributes: museStar.targetAttributes,
-      context: museStar.context,
-    }),
+    body: JSON.stringify(request),
   });
 
   if (!response.ok) {

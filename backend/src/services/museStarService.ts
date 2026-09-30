@@ -4,21 +4,19 @@ import {
   STYLE_DIMENSION_ID,
   MOOD_DIMENSION_ID,
 } from '../config/attributeDimensions.js';
+import { MuseStar, MUSE_PROMPT_LIMITS } from '../shared/museStarContract.js';
 
-export interface MuseStar {
-  id: string;
-  type: 'muse_star';
-  userId: string;
-  targetAttributes: Array<{
-    type: string;
-    value: string;
-  }>;
-  context: {
-    nearbyImages: string[]; // IDs of nearby images
-    attributeGap: string; // Description of what's underexplored
-    imageCount: number;
-  };
-  position?: { x: number; y: number }; // Optional suggested position
+/**
+ * Only offer Muse Stars that POST /muse-stars/prompts will accept. Attribute
+ * values come from Gemini's image analysis, which doesn't cap their length.
+ */
+function fitsPromptLimits(museStar: MuseStar): boolean {
+  return museStar.targetAttributes.every(
+    (a) =>
+      typeof a.value === 'string' &&
+      a.value.length > 0 &&
+      a.value.length <= MUSE_PROMPT_LIMITS.attributeValueLength
+  );
 }
 
 /**
@@ -88,7 +86,7 @@ export async function detectMuseStarsForUser(
       },
     }));
 
-    return museStars;
+    return museStars.filter(fitsPromptLimits);
   });
 }
 
@@ -160,7 +158,7 @@ export async function detectMuseStarsByBuckets(
       },
     }));
 
-    return museStars;
+    return museStars.filter(fitsPromptLimits);
   });
 }
 

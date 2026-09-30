@@ -101,16 +101,20 @@ WHITELISTED_EMAILS=your.email@gmail.com,another@example.com
 
 ## Access Control
 
-By default, the application is gated. Only whitelisted users can upload images and access full features.
+By default, the application is gated. Anyone can sign in with Google, but only whitelisted users can use the app: the map, the AI Muse and uploads. Everyone else can only check their session and join the waitlist.
 
 **To manage the whitelist:**
 1. Open `backend/.env`
-2. Add authorized email addresses to the `WHITELISTED_EMAILS` environment variable (comma-separated):
+2. Add authorized email addresses to the `WHITELISTED_EMAILS` environment variable (comma-separated, case doesn't matter):
    ```env
    WHITELISTED_EMAILS=demo@example.com,your.email@gmail.com
    ```
 
-**Note:** Access control is enforced in the **backend only**. The frontend authenticates users via Google OAuth, but upload permissions and data access are controlled server-side.
+**Note:** Access control is enforced in the **backend only**, in one place: `backend/src/app.ts` puts the whitelist check in front of every route except health checks, sign-in, the session check and the waitlist, so new routes are gated by default. The frontend only uses the `whitelisted` flag to decide which screen to show.
+
+**Limits on Gemini calls:** each user can ask the AI Muse for suggestions 30 times an hour and have 30 uploads analyzed an hour; past that the server answers 429. The limits are in `backend/src/middleware/rateLimitMiddleware.ts` and reset when the server restarts.
+
+**Privacy:** graph responses (`/graph/ego`, `/graph/global`) never include email addresses, only each user's ID, name and profile picture.
 
 ## Running the App
 

@@ -91,7 +91,7 @@ Graph Starz creates an interconnected network of users, images, and AI-generated
 
 ### Graph Queries
 - `GET /graph/ego` - Get user's ego network (their uploads + attributes)
-- `GET /graph/global` - Get sampled global graph (paginated)
+- `GET /graph/global` - Get sampled global graph (paginated: `limit` capped at 100, `skip` up to 10,000; allow-listed users only)
 - `GET /graph/image/:id` - Get specific image with its network
 
 ### User Operations
@@ -173,7 +173,7 @@ Graph Starz creates an interconnected network of users, images, and AI-generated
 - [x] Attribute extraction (style, mood, subject, color)
 - [x] Graph persistence (graphService.ts - createImageWithAttributes)
 - [x] Upload routes (/uploads/init, /uploads/complete)
-- [x] Whitelist enforcement on uploads
+- [x] Whitelist enforcement on every route except health, sign-in and the waitlist (one gate in `app.ts`)
 
 ### Phase 3: Graph Visualization ✅
 - [x] Ego network queries (getUserEgoNetwork)
@@ -249,11 +249,12 @@ CREATE INDEX attribute_lookup IF NOT EXISTS
 
 1. **Authentication**: Google OAuth only, JWT for sessions
 2. **Authorization**: Users can only modify their own content
-3. **Rate Limiting**: Upload and AI analysis throttling
-4. **Input Validation**: Zod schemas for all endpoints
+3. **Rate Limiting**: Per-user limits on the routes that call Gemini (AI Muse prompts, upload analysis)
+4. **Input Validation**: Zod schemas for all endpoints, with size limits on anything that reaches a Gemini prompt
 5. **CORS**: Restrict to frontend origin
 6. **Secrets**: All keys in environment variables
 7. **SQL Injection**: Not applicable (Neo4j uses Cypher with parameters)
+8. **Privacy**: Graph responses never include email addresses
 
 ## Performance Targets
 

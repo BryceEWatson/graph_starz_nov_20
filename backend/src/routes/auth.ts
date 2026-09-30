@@ -28,7 +28,8 @@ authRouter.post('/google', async (req: Request, res: Response) => {
   // Find or create user in database
   const user = await findOrCreateUser(googleUser);
 
-  // Generate JWT (even for non-whitelisted users, for session management)
+  // Generate JWT even for non-whitelisted users, so they can check their session
+  // and join the waitlist. Every other route rejects them (see app.ts).
   const token = generateJWT(user);
 
   res.json({

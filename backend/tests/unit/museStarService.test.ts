@@ -12,13 +12,14 @@ vi.mock('../../src/config/neo4j.js', () => ({
   runReadTransaction: vi.fn(),
 }));
 
+import neo4j from 'neo4j-driver';
 import { runReadTransaction } from '../../src/config/neo4j.js';
 import {
   detectMuseStarsForUser,
   detectMuseStarsByBuckets,
   getMuseStarsForUser,
-  MuseStar,
 } from '../../src/services/museStarService.js';
+import { MuseStar, MUSE_PROMPT_LIMITS } from '../../src/shared/museStarContract.js';
 
 describe('MuseStarService', () => {
   beforeEach(() => {
@@ -95,10 +96,10 @@ describe('MuseStarService', () => {
 
       await detectMuseStarsForUser('user-123', 3);
 
-      // Verify limit was passed to the query
+      // Verify limit was passed to the query as a Neo4j integer (LIMIT rejects floats)
       expect(mockTx.run).toHaveBeenCalledWith(
         expect.any(String),
-        expect.objectContaining({ userId: 'user-123', limit: 3 })
+        expect.objectContaining({ userId: 'user-123', limit: neo4j.int(3) })
       );
     });
   });
@@ -132,6 +133,54 @@ describe('MuseStarService', () => {
       expect(result[0].targetAttributes).toContainEqual({ type: 'mood', value: 'energetic' });
       expect(result[0].context.attributeGap).toContain('cyberpunk style');
       expect(result[0].context.attributeGap).toContain('energetic mood');
+    });
+  });
+
+  describe('Muse Stars the prompts route would reject', () => {
+    function recordsFrom(rows: Array<Record<string, unknown>>) {
+      return rows.map((row) => ({ get: (key: string) => row[key] }));
+    }
+
+    it('skips one whose attribute value is longer than the prompt limit', async () => {
+      const mockTx = {
+        run: vi.fn().mockResolvedValue({
+          records: recordsFrom([
+            { styleValue: 'watercolor', moodValue: 'serene', imageCount: 1, imageIds: ['img-1'] },
+            {
+              styleValue: 'x'.repeat(MUSE_PROMPT_LIMITS.attributeValueLength + 1),
+              moodValue: 'serene',
+              imageCount: 1,
+              imageIds: ['img-2'],
+            },
+          ]),
+        }),
+      };
+      vi.mocked(runReadTransaction).mockImplementation(async (fn: any) => fn(mockTx));
+
+      const result = await detectMuseStarsByBuckets('user-123');
+
+      expect(result).toHaveLength(1);
+      expect(result[0].targetAttributes[0].value).toBe('watercolor');
+    });
+
+    it('keeps one whose attribute value is exactly at the limit', async () => {
+      const mockTx = {
+        run: vi.fn().mockResolvedValue({
+          records: recordsFrom([
+            {
+              attrType: 'style',
+              attrValue: 'x'.repeat(MUSE_PROMPT_LIMITS.attributeValueLength),
+              imageCount: 1,
+              imageIds: ['img-1'],
+            },
+          ]),
+        }),
+      };
+      vi.mocked(runReadTransaction).mockImplementation(async (fn: any) => fn(mockTx));
+
+      const result = await detectMuseStarsForUser('user-123');
+
+      expect(result).toHaveLength(1);
     });
   });
 

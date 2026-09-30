@@ -1,6 +1,5 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
-import { requireAuth } from '../middleware/authMiddleware.js';
 import {
   generateSignedUploadUrl,
   getPublicUrl,
@@ -9,21 +8,11 @@ import {
 } from '../services/storageService.js';
 import { analyzeImage } from '../services/aiService.js';
 import { createImageWithAttributes } from '../services/graphService.js';
-import { isWhitelisted } from '../services/authService.js';
 import { ApiError } from '../middleware/errorMiddleware.js';
+import { uploadAnalysisRateLimit } from '../middleware/rateLimitMiddleware.js';
 
+// Mounted behind requireAllowListedUser (app.ts), so req.user is always set.
 export const uploadsRouter = Router();
-
-// All upload routes require authentication
-uploadsRouter.use(requireAuth);
-
-// Additional check: user must be whitelisted to upload
-uploadsRouter.use((req: Request, _res: Response, next) => {
-  if (!req.user || !isWhitelisted(req.user.email)) {
-    throw new ApiError(403, 'Upload access requires whitelist approval');
-  }
-  next();
-});
 
 const initUploadSchema = z.object({
   filename: z.string().min(1),
@@ -64,13 +53,13 @@ uploadsRouter.post('/init', async (req: Request, res: Response) => {
  *
  * Security: validateAndConsumePendingUpload ensures imageId/gcsPath were issued
  * by /init for this specific user. Prevents spoofed completions.
+ * The analysis calls Gemini, so it's rate limited per user.
  *
  * TODO (future hardening):
  * - Verify the file actually exists in GCS before processing
- * - Add rate limiting per user
  * - Consider file size validation
  */
-uploadsRouter.post('/complete', async (req: Request, res: Response) => {
+uploadsRouter.post('/complete', uploadAnalysisRateLimit, async (req: Request, res: Response) => {
   const { imageId, gcsPath } = completeUploadSchema.parse(req.body);
   const userId = req.user!.id;
 

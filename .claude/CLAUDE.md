@@ -192,7 +192,8 @@ graph-starz/
 │   │   │   └── neo4j.ts            # ✅ Database connection
 │   │   ├── middleware/
 │   │   │   ├── errorMiddleware.ts  # ✅ Error handling
-│   │   │   └── authMiddleware.ts   # ✅ JWT auth middleware
+│   │   │   ├── authMiddleware.ts   # ✅ JWT auth + allow-list gate
+│   │   │   └── rateLimitMiddleware.ts # ✅ Per-user limits on Gemini routes
 │   │   ├── routes/
 │   │   │   ├── health.ts           # ✅ Health checks
 │   │   │   ├── auth.ts             # ✅ Google OAuth, JWT, waitlist
@@ -207,6 +208,9 @@ graph-starz/
 │   │   │   ├── museStarService.ts  # ✅ Gap detection
 │   │   │   ├── aiMuseService.ts    # ✅ Prompt generation
 │   │   │   └── similarityService.ts# ⏳ Phase 4 (future)
+│   │   ├── shared/
+│   │   │   └── museStarContract.ts # ✅ Muse API types, also imported by the front end
+│   │   ├── app.ts                  # ✅ Express app: routes + allow-list gate (mount new routers below it)
 │   │   └── utils/
 │   │       └── logger.ts           # ✅ Winston logging
 │   │

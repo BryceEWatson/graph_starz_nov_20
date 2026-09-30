@@ -1,3 +1,4 @@
+import neo4j from 'neo4j-driver';
 import { runWriteTransaction, runReadTransaction } from '../config/neo4j.js';
 import { ImageAnalysis } from './aiService.js';
 
@@ -41,6 +42,29 @@ export interface GraphEdge {
 export interface GraphData {
   nodes: GraphNode[];
   edges: GraphEdge[];
+}
+
+/** The user fields the map draws. The stored email is deliberately not one of them. */
+interface UserNodeProperties {
+  id: string;
+  name?: string;
+  profilePictureUrl?: string;
+}
+
+/**
+ * Build the map node for a user. Every graph response builds user nodes here,
+ * so no graph response carries an email address.
+ */
+function toUserGraphNode(user: { properties: UserNodeProperties }): GraphNode {
+  return {
+    id: user.properties.id,
+    type: 'user',
+    properties: {
+      id: user.properties.id,
+      name: user.properties.name,
+      profilePictureUrl: user.properties.profilePictureUrl,
+    },
+  };
 }
 
 /**
@@ -149,16 +173,7 @@ export async function getUserEgoNetwork(userId: string): Promise<GraphData> {
 
     // Add user node
     const user = record.get('u');
-    nodes.push({
-      id: user.properties.id,
-      type: 'user',
-      properties: {
-        id: user.properties.id,
-        email: user.properties.email,
-        name: user.properties.name,
-        profilePictureUrl: user.properties.profilePictureUrl,
-      },
-    });
+    nodes.push(toUserGraphNode(user));
     nodeIds.add(user.properties.id);
 
     // Add image nodes (user's uploads)
@@ -306,7 +321,8 @@ export async function getGlobalGraphSample(
       MATCH (u:User)-[uploadRel:UPLOADED]->(i)
       RETURN i, u, attrs, uploadRel
       `,
-      { limit, skip }
+      // SKIP and LIMIT reject floats, and plain JS numbers are sent as floats
+      { limit: neo4j.int(limit), skip: neo4j.int(skip) }
     );
 
     const nodes: GraphNode[] = [];
@@ -321,16 +337,7 @@ export async function getGlobalGraphSample(
 
       // Add user node
       if (user && user.properties && !nodeIds.has(user.properties.id)) {
-        nodes.push({
-          id: user.properties.id,
-          type: 'user',
-          properties: {
-            id: user.properties.id,
-            email: user.properties.email,
-            name: user.properties.name,
-            profilePictureUrl: user.properties.profilePictureUrl,
-          },
-        });
+        nodes.push(toUserGraphNode(user));
         nodeIds.add(user.properties.id);
       }
 

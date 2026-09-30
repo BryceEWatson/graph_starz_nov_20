@@ -71,7 +71,8 @@ function loadConfig() {
       redirectUri: process.env.GOOGLE_OAUTH_REDIRECT_URI,
     },
     frontendOrigin: process.env.FRONTEND_ORIGIN,
-    whitelistedEmails: process.env.WHITELISTED_EMAILS?.split(',').map(e => e.trim()) || [],
+    // Lowercased so the allow-list check (isWhitelisted) ignores case
+    whitelistedEmails: process.env.WHITELISTED_EMAILS?.split(',').map(e => e.trim().toLowerCase()) || [],
   };
 
   try {
